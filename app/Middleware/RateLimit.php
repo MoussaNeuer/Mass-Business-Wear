@@ -63,7 +63,22 @@ final class RateLimit
             return [];
         }
         $json = json_decode((string) file_get_contents($file), true);
-        return is_array($json) ? $json : [];
+        if (!is_array($json)) {
+            return [];
+        }
+        // Purge : on ne garde que les buckets ayant des hits récents (< 24 h)
+        $cutoff = time() - 86400;
+        $clean = [];
+        foreach ($json as $bucket => $hits) {
+            if (!is_array($hits)) {
+                continue;
+            }
+            $recent = array_filter($hits, static fn ($ts) => (int) $ts > $cutoff);
+            if ($recent !== []) {
+                $clean[(string) $bucket] = array_values($recent);
+            }
+        }
+        return $clean;
     }
 
     private static function save(array $data): void

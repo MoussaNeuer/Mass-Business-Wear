@@ -2,7 +2,13 @@
 (function () {
   'use strict';
 
-  var base = (window.MBW_BASE || '/mass-business-wear/public/').replace(/\/?$/, '/');
+  // Base dynamique : MBW_BASE défini par le layout (aucun chemin en dur)
+  var base = (window.MBW_BASE || (function () {
+    // Repli : racine détectée depuis le lien manifest de la page
+    var m = document.querySelector('link[rel="manifest"]');
+    if (m && m.href) return m.href.replace(/manifest\.admin\.json.*$/, '');
+    return '/';
+  })()).replace(/\/?$/, '/');
 
   // ------------------------------------------------ Service worker admin
   if ('serviceWorker' in navigator) {

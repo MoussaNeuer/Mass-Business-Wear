@@ -1059,6 +1059,34 @@
   }
 }
 
+/* --------------------------------------------------------- Actions commande (B5) */
+
+.admin-order-actions {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+  margin-top: .7rem;
+  padding-top: .7rem;
+  border-top: 1px solid rgba(255, 255, 255, .07);
+}
+
+.admin-order-actions .admin-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+}
+
+.admin-order-actions form { margin: 0; flex: 1 1 auto; }
+
+.admin-btn--wa {
+  background: #1fbf5f !important;
+  color: #04160a !important;
+  font-weight: 800;
+}
+
+.admin-btn--wa:hover { background: #25d366 !important; }
+
 /* --------------------------------------------------------- Print */
 
 @media print {

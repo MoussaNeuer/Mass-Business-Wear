@@ -88,23 +88,30 @@ JS;
 <footer class="shop-footer">
   <div class="container-app">
     <div class="row g-4">
-      <div class="col-12 col-md-4">
+      <div class="col-12 col-md-3">
         <h3>MASS <span class="text-red">BUSINESS WEAR</span></h3>
         <p>Prêt-à-porter premium. Commandez en ligne, recevez confirmation sur WhatsApp.</p>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-2">
         <h3>Boutique</h3>
         <a href="<?= Url::to('shop') ?>">Tous les produits</a>
         <a href="<?= Url::to('category/vetements') ?>">Vêtements</a>
         <a href="<?= Url::to('category/ensembles') ?>">Ensembles</a>
         <a href="<?= Url::to('category/accessoires') ?>">Accessoires</a>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-2">
         <h3>Aide</h3>
         <a href="<?= Url::to('contact') ?>">Nous contacter</a>
         <a href="<?= Url::to('cart') ?>">Mon panier</a>
+        <a href="<?= Url::to('about') ?>">À propos</a>
       </div>
-      <div class="col-12 col-md-2">
+      <div class="col-6 col-md-3">
+        <h3>Informations</h3>
+        <a href="<?= Url::to('legal/terms') ?>">Conditions de vente</a>
+        <a href="<?= Url::to('legal/privacy') ?>">Confidentialité</a>
+        <a href="<?= Url::to('contact') ?>">Livraison</a>
+      </div>
+      <div class="col-6 col-md-2">
         <h3>Suivez-nous</h3>
         <a href="<?= Url::to('contact') ?>">WhatsApp</a>
         <a href="<?= Url::to('contact') ?>">Instagram</a>

@@ -37,7 +37,35 @@ routes/         web.php, admin.php, api.php
 storage/        logs/ cache/   (hors web)
 ```
 
-## Phases livrées
+## État du projet
+
+> **Socle solide, mise en production conditionnée au Sprint 2 et au Sprint 3.**
+> Audit complet disponible : le README ci-dessous décrit ce qui est livré et testé,
+> les correctifs d'audit sont regroupés par sprints.
+
+### Sprint 1 — Corrections bloquantes ✅ (testé)
+- **B1** `WhatsAppService.php` renommé (case-sensitive) : le checkout ne plante plus sous Linux
+- **B2** commande sans `variant_id` **refusée** (plus de stock contourné)
+- **B3** manifests PWA **dynamiques** (`ManifestController`, aucun chemin en dur) + fallback SW sur `registration.scope` + `MBW_BASE` côté admin
+- **B5** boutons **WhatsApp / Appeler / Confirmer en 1 tap** sur chaque commande (liste + détail)
+- **B6** pages **/about, /legal/terms, /legal/privacy** (contenu réel, footer, sitemap)
+- **B7** suppression de commande **remplacée par l'archivage** (`archived_at`, historique et CA conservés, restauration possible)
+- **L1** réactivation après annulation **verrouillée sur le stock** (refus + message si insuffisant)
+- **L2** workflow des statuts strict (transitions autorisées uniquement ; `DELIVERED` terminal)
+- **L3** `sold_count` incrémenté à la livraison, décrémenté en cas de retour
+- **L6** numéro WhatsApp **obligatoire et validé** dans les paramètres admin
+- **S2** limite dédiée commandes : **5/h par IP + 3/h par numéro** (en plus du quota global) ; purge automatique du fichier de rate limit
+- **S4** en `APP_ENV=production`, `APP_DEBUG` est **toujours forcé à false**
+- **L9** : erreurs BD en 500 (plus 422), `Referer` validé hôte + chemin `/admin`, variantes verrouillées au produit de l'URL (anti-IDOR), `promo_price < price`
+
+### À venir (audit)
+- **Sprint 2** — Photos/stock : `ImageService` (GD, WebP, miniatures, multi-upload, caméra), page Stock + historique, revalidation panier serveur, `og:image` produit, menu admin « Plus »
+- **Sprint 3** — Durcissement : CSP nonce, login par IP+identifiant, `schema.sql` sans `DROP`, nettoyage fichiers vides, tests/Checklists, Lighthouse mobile, checklist production (HTTPS, `.env`, sauvegardes)
+
+## Phases livrées (détail)
+
+> Note : les phases ci-dessous décrivent les fonctionnalités en place.
+> La **faisabilité en production** se juge sur les sprints ci-dessus.
 
 **Phase 1 — Fondations** ✅
 - `.env` + parseur maison, config centralisée
@@ -71,7 +99,7 @@ storage/        logs/ cache/   (hors web)
 - Layout admin : topbar sticky, bottom nav 5 onglets (Accueil, Commandes, Produits, Catégories, Réglages), flash toasts, animations fluides (stagger, transitions, `prefers-reduced-motion`)
 - Dashboard : stats (CA, commandes, clients, produits), commandes récentes, stock faible, CA 7 jours, meilleures ventes
 - Produits : liste (recherche, statut, featured), create/edit (slug auto, promo, SEO), variantes (taille/couleur/SKU/stock), images (upload MIME+2 Mo, principale, suppression), featured/status, zone dangereuse
-- Commandes : liste (filtres statut + recherche), détail (client, articles, totaux), changement de statut (transaction + retour stock si annulation), historique timeline, suppression
+- Commandes : liste (filtres statut + recherche), détail (client, articles, totaux), changement de statut (transaction + workflow strict + retour stock si annulation), actions rapides WhatsApp/Appeler/Confirmer, historique timeline, archivage (jamais de suppression définitive)
 - Catégories : CRUD (création + édition inline)
 - Paramètres : boutique, contact, réseaux, zones de livraison CRUD
 - Journal : actions admin paginées, filtre par admin

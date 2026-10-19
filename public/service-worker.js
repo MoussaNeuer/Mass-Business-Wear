@@ -47,6 +47,7 @@ self.addEventListener('fetch', (e) => {
 
   // Navigation : réseau d'abord, fallback page offline
   if (req.mode === 'navigate') {
+    const scope = self.registration ? self.registration.scope : '/';
     e.respondWith(
       fetch(req)
         .then((res) => {
@@ -55,8 +56,8 @@ self.addEventListener('fetch', (e) => {
           return res;
         })
         .catch(() =>
-          caches.match(req).then((hit) => hit || caches.match('/mass-business-wear/public/') ||
-            new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Hors ligne</title><body style="font-family:system-ui;background:#0A0A0A;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0"><div style="text-align:center;padding:1.5rem"><h1>Vous êtes hors ligne</h1><p style="color:#9ca3af">La boutique sera de retour dès que vous serez reconnecté.</p><a style="color:#f87171;font-weight:700" href="/mass-business-wear/public/">Réessayer</a></div></body>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+          caches.match(req).then((hit) => hit || caches.match(scope) ||
+            new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Hors ligne</title><body style="font-family:system-ui;background:#0A0A0A;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0"><div style="text-align:center;padding:1.5rem"><h1>Vous êtes hors ligne</h1><p style="color:#9ca3af">La boutique sera de retour dès que vous serez reconnecté.</p><a style="color:#f87171;font-weight:700" href="' + scope + '">Réessayer</a></div></body>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
           )
         )
     );

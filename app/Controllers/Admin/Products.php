@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers\Admin;
 
+use App\Helpers\Database;
 use App\Helpers\Request;
 use App\Helpers\Response;
 use App\Helpers\Security;
@@ -146,6 +147,9 @@ final class Products extends BaseAdmin
     {
         $id = (int) $id;
         $variantId = (int) $variantId;
+        if (!$this->variantBelongsTo($id, $variantId)) {
+            Response::abort(404, 'Variante introuvable pour ce produit.');
+        }
         $stock = Request::int('stock', 0);
         try {
             AdminProductRepository::updateVariant($variantId, [
@@ -165,9 +169,23 @@ final class Products extends BaseAdmin
 
     public function variantDestroy(string $id, string $variantId): never
     {
+        $id = (int) $id;
+        if (!$this->variantBelongsTo($id, (int) $variantId)) {
+            Response::abort(404, 'Variante introuvable pour ce produit.');
+        }
         AdminProductRepository::deleteVariant((int) $variantId);
         self::log('variant.delete', '#' . $variantId);
-        self::redirect(Url::admin('products/' . (int) $id . '/edit'), 'Variante supprimée.');
+        self::redirect(Url::admin('products/' . $id . '/edit'), 'Variante supprimée.');
+    }
+
+    /** L9 : la variante doit appartenir au produit de l'URL (anti IDOR). */
+    private function variantBelongsTo(int $productId, int $variantId): bool
+    {
+        $n = (int) Database::value(
+            'SELECT COUNT(*) FROM product_variants WHERE id = ? AND product_id = ?',
+            [$variantId, $productId]
+        );
+        return $n > 0;
     }
 
     // ------------------------------------------------------------- Images
@@ -235,6 +253,9 @@ final class Products extends BaseAdmin
         }
         $promo = Request::str('promo_price', '');
         $promoVal = ($promo !== '' && (int) $promo > 0) ? (int) $promo : null;
+        if ($promoVal !== null && $promoVal >= $price) {
+            self::backError('Le prix promo doit être inférieur au prix normal.');
+        }
         $status = Request::post('status', 'draft');
         if (!in_array($status, ['draft', 'active', 'archived'], true)) {
             $status = 'draft';

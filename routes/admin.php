@@ -59,7 +59,9 @@ $router->group('/admin', function (Router $r) {
     $r->get('/orders', [Orders::class, 'index'], [AdminAuth::class]);
     $r->get('/orders/{id:\d+}', [Orders::class, 'show'], [AdminAuth::class]);
     $r->post('/orders/{id:\d+}/status', [Orders::class, 'updateStatus'], [AdminAuth::class]);
-    $r->post('/orders/{id:\d+}/delete', [Orders::class, 'destroy'], [AdminAuth::class]);
+    $r->post('/orders/{id:\d+}/confirm', [Orders::class, 'confirm'], [AdminAuth::class]);
+    $r->post('/orders/{id:\d+}/archive', [Orders::class, 'archive'], [AdminAuth::class]);
+    $r->post('/orders/{id:\d+}/unarchive', [Orders::class, 'unarchive'], [AdminAuth::class]);
 
     // Paramètres
     $r->get('/settings', [Settings::class, 'index'], [AdminAuth::class]);

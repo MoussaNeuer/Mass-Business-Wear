@@ -42,6 +42,7 @@ $active = static function (array $item) use ($path): bool {
 <link rel="apple-touch-icon" href="<?= Url::asset('img/apple-touch-icon.png') ?>">
 <link rel="icon" type="image/png" sizes="64x64" href="<?= Url::asset('img/favicon-64.png') ?>">
 <?= Security::csrfMeta() ?>
+<script>window.MBW_BASE = <?= json_encode(rtrim(\App\Helpers\BaseUrl::url('/'), '/') . '/', JSON_UNESCAPED_SLASHES) ?>;</script>
 <link rel="stylesheet" href="<?= Url::asset('vendor/bootstrap/css/bootstrap.min.css') ?>">
 <link rel="stylesheet" href="<?= Url::asset('css/tokens.css') ?>">
 <link rel="stylesheet" href="<?= Url::asset('css/app.css') ?>">

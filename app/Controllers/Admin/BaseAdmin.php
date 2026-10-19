@@ -60,8 +60,17 @@ abstract class BaseAdmin
     protected static function backError(string $message): never
     {
         self::flash($message, 'err');
+        // L9 : Referer accepté uniquement si même hôte + chemin /admin (anti open-redirect)
         $ref = Request::header('Referer');
-        $url = is_string($ref) && str_contains($ref, '/admin') ? $ref : Url::admin();
+        $url = Url::admin();
+        if (is_string($ref) && $ref !== '') {
+            $host = parse_url($ref, PHP_URL_HOST);
+            $self = parse_url(Url::to('/'), PHP_URL_HOST);
+            $path = (string) parse_url($ref, PHP_URL_PATH);
+            if (is_string($host) && $host === $self && str_starts_with($path, '/admin')) {
+                $url = $ref;
+            }
+        }
         Response::redirect($url);
     }
 }

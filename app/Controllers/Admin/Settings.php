@@ -34,6 +34,15 @@ final class Settings extends BaseAdmin
         if ($pairs['currency'] === '') {
             $pairs['currency'] = 'FCFA';
         }
+        // L6 : le WhatsApp boutique est obligatoire (liens de confirmation commande)
+        $waDigits = preg_replace('/\D+/', '', $pairs['whatsapp']) ?? '';
+        if ($waDigits === '') {
+            self::backError('Le numéro WhatsApp est obligatoire : sans lui, les clients ne peuvent pas confirmer leur commande.');
+        }
+        if (preg_match('/^(?:221)?[237]\d{8}$/', $waDigits) !== 1) {
+            self::backError('Numéro WhatsApp invalide : 9 chiffres attendus (ex. 771234567).');
+        }
+        $pairs['whatsapp'] = $waDigits;
         AdminSettingRepository::saveMany($pairs);
         self::log('settings.update', 'Paramètres boutique');
         self::redirect(Url::admin('settings'), 'Paramètres enregistrés.');

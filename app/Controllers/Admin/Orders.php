@@ -19,11 +19,13 @@ final class Orders extends BaseAdmin
             'status' => Request::str('status', ''),
             'q' => trim(Request::str('q', '')),
             'page' => max(1, Request::int('page', 1)),
+            'archived' => Request::str('archived', '') === '1',
         ];
         self::render('admin/orders/index', AdminOrderRepository::list($f) + [
             'filters' => $f,
             'statusCounts' => AdminOrderRepository::countByStatus(),
             'statusLabels' => AdminOrderRepository::STATUS_LABELS,
+            'whatsappNumber' => (string) \App\Repositories\SettingRepository::whatsapp(),
         ], 'Commandes');
     }
 
@@ -39,7 +41,9 @@ final class Orders extends BaseAdmin
             'items' => AdminOrderRepository::items($id),
             'history' => AdminOrderRepository::history($id),
             'statusLabels' => AdminOrderRepository::STATUS_LABELS,
+            'allowedStatuses' => AdminOrderRepository::TRANSITIONS[(string) $order['status']] ?? [],
             'currency' => SettingRepository::currency(),
+            'whatsappNumber' => (string) SettingRepository::whatsapp(),
         ], 'Commande ' . $order['reference']);
     }
 
@@ -55,24 +59,56 @@ final class Orders extends BaseAdmin
         if ($order === null) {
             Response::abort(404);
         }
-        $ok = AdminOrderRepository::updateStatus($id, $status, $note, $this->adminId());
-        if (!$ok) {
-            self::backError('Changement de statut impossible.');
+        $err = AdminOrderRepository::updateStatus($id, $status, $note, $this->adminId());
+        if ($err !== null) {
+            self::backError($err);
         }
         self::log('order.status', $order['reference'] . ' → ' . $status . ($note !== '' ? ' (' . $note . ')' : ''));
         self::redirect(Url::admin('orders/' . $id), 'Statut mis à jour : ' . (AdminOrderRepository::STATUS_LABELS[$status] ?? $status) . '.');
     }
 
-    public function destroy(string $id): never
+    /** Confirmation en 1 tap (B5) : NEW → CONFIRMED. */
+    public function confirm(string $id): never
     {
         $id = (int) $id;
         $order = AdminOrderRepository::find($id);
         if ($order === null) {
             Response::abort(404);
         }
-        AdminOrderRepository::delete($id);
-        self::log('order.delete', $order['reference']);
-        self::redirect(Url::admin('orders'), 'Commande supprimée.');
+        $err = AdminOrderRepository::updateStatus($id, 'CONFIRMED', 'Confirmée en 1 tap', $this->adminId());
+        if ($err !== null) {
+            self::backError($err);
+        }
+        self::log('order.confirm', $order['reference']);
+        self::redirect(Url::admin('orders/' . $id), 'Commande ' . $order['reference'] . ' confirmée.');
+    }
+
+    /** B7 : archivage au lieu de la suppression définitive. */
+    public function archive(string $id): never
+    {
+        $id = (int) $id;
+        $order = AdminOrderRepository::find($id);
+        if ($order === null) {
+            Response::abort(404);
+        }
+        if (!empty($order['archived_at'])) {
+            self::backError('Cette commande est déjà archivée.');
+        }
+        AdminOrderRepository::archive($id);
+        self::log('order.archive', $order['reference']);
+        self::redirect(Url::admin('orders?archived=1'), 'Commande archivée (historique et CA conservés).');
+    }
+
+    public function unarchive(string $id): never
+    {
+        $id = (int) $id;
+        $order = AdminOrderRepository::find($id);
+        if ($order === null) {
+            Response::abort(404);
+        }
+        AdminOrderRepository::unarchive($id);
+        self::log('order.unarchive', $order['reference']);
+        self::redirect(Url::admin('orders'), 'Commande restaurée.');
     }
 
     private function adminId(): ?int

@@ -5,24 +5,39 @@
  * @var array $items
  * @var array $history
  * @var array $statusLabels
+ * @var array $allowedStatuses
  * @var string $currency
+ * @var string $whatsappNumber
  */
 use App\Helpers\Security;
 use App\Helpers\Url;
 
 $badge = static fn (string $s): string => 'admin-badge admin-badge--' . strtolower($s);
-$statusOptions = [
-    'NEW' => 'Nouvelle',
-    'CONFIRMED' => 'Confirmée',
-    'PROCESSING' => 'En préparation',
-    'READY' => 'Prête',
-    'DELIVERED' => 'Livrée',
-    'CANCELLED' => 'Annulée (restock)',
-];
+$statusOptions = array_filter(
+    [
+        'NEW' => 'Nouvelle',
+        'CONFIRMED' => 'Confirmée',
+        'PROCESSING' => 'En préparation',
+        'READY' => 'Prête',
+        'DELIVERED' => 'Livrée',
+        'CANCELLED' => 'Annulée (restock)',
+    ],
+    static fn (string $val): bool => in_array($val, $allowedStatuses ?? [], true),
+    ARRAY_FILTER_USE_KEY
+);
+$isArchived = !empty($order['archived_at']);
+$phoneRaw = preg_replace('/\D+/', '', (string) $order['customer_phone']) ?? '';
+$phoneIntl = ($phoneRaw !== '' && !str_starts_with($phoneRaw, '221')) ? '221' . $phoneRaw : $phoneRaw;
+$waText = 'Bonjour ' . $order['customer_name'] . ', au sujet de votre commande '
+    . $order['reference'] . ' (' . number_format((int) $order['total'], 0, ',', ' ') . ' FCFA).';
+$waUrl = $phoneIntl !== ''
+    ? 'https://wa.me/' . $phoneIntl . '?text=' . rawurlencode($waText)
+    : '';
+$canConfirm = in_array('CONFIRMED', $allowedStatuses ?? [], true);
 ?>
 <div class="admin-pagehead">
   <div>
-    <h1><?= Security::e((string) $order['reference']) ?></h1>
+    <h1><?= Security::e((string) $order['reference']) ?><?= $isArchived ? ' 📦' : '' ?></h1>
     <p><?= Security::e(\App\Helpers\Format::date((string) $order['created_at'], 'd/m/Y H:i')) ?></p>
   </div>
   <a class="admin-btn admin-btn--ghost admin-btn--sm" href="<?= Url::admin('orders') ?>">← Liste</a>
@@ -50,6 +65,24 @@ $statusOptions = [
   </div>
 </div>
 
+<?php if (!$isArchived): ?>
+<div class="admin-card admin-order-actions" style="gap:.5rem;flex-wrap:wrap">
+  <?php if ($waUrl !== ''): ?>
+    <a class="admin-btn admin-btn--sm admin-btn--wa" href="<?= Security::e($waUrl) ?>" target="_blank" rel="noopener" style="flex:1">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.5 14.1c-.2.7-1.3 1.3-2.1 1.4-.6.1-1.3.1-2.1-.1a12 12 0 0 1-6.5-5.7c-.6-1.1-.6-2.2 0-3.3.2-.4.6-.9 1-.9h.7c.2 0 .5-.1.8.6l.9 2.1c.1.2.1.4 0 .6l-.4.6c-.1.2-.3.4-.1.7a9 9 0 0 0 3.8 3.4c.3.1.5.1.7-.1l.9-1c.2-.2.4-.3.7-.2l2.1 1c.3.1.5.3.6.4.1.2.1.6-.1 1.1z"/></svg>
+      WhatsApp
+    </a>
+  <?php endif; ?>
+  <a class="admin-btn admin-btn--sm admin-btn--dark" href="tel:<?= Security::e($phoneIntl) ?>" style="flex:1">📞 Appeler</a>
+  <?php if ($canConfirm): ?>
+    <form method="post" action="<?= Url::admin('orders/' . (int) $order['id'] . '/confirm') ?>" style="margin:0;flex:1">
+      <?= Security::csrfField() ?>
+      <button class="admin-btn admin-btn--sm admin-btn--primary admin-btn--block" type="submit">✓ Confirmer</button>
+    </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="admin-card">
   <div class="admin-card__head"><h2 class="admin-card__title">Articles</h2></div>
   <?php foreach ($items as $it): ?>
@@ -68,6 +101,7 @@ $statusOptions = [
   <?php endforeach; ?>
 </div>
 
+<?php if ($statusOptions !== [] && !$isArchived): ?>
 <div class="admin-card">
   <div class="admin-card__head"><h2 class="admin-card__title">Changer le statut</h2></div>
   <form method="post" action="<?= Url::admin('orders/' . (int) $order['id'] . '/status') ?>">
@@ -78,6 +112,7 @@ $statusOptions = [
           <option value="<?= $val ?>" <?= $order['status'] === $val ? 'selected' : '' ?>><?= Security::e($label) ?></option>
         <?php endforeach; ?>
       </select>
+      <small class="text-muted">Seules les transitions autorisées sont proposées.</small>
     </div>
     <div class="admin-field">
       <label for="o-note">Note (optionnel)</label>
@@ -86,6 +121,7 @@ $statusOptions = [
     <button class="admin-btn admin-btn--primary admin-btn--block" type="submit">Mettre à jour</button>
   </form>
 </div>
+<?php endif; ?>
 
 <div class="admin-card">
   <div class="admin-card__head"><h2 class="admin-card__title">Historique</h2></div>
@@ -115,9 +151,19 @@ $statusOptions = [
 </div>
 
 <div class="admin-card" style="border-color:rgba(212,0,0,.2)">
-  <div class="admin-card__head"><h2 class="admin-card__title" style="color:#f87171">Zone dangereuse</h2></div>
-  <form method="post" action="<?= Url::admin('orders/' . (int) $order['id'] . '/delete') ?>"
-        data-confirm="Supprimer définitivement la commande <?= Security::e((string) $order['reference']) ?> ?">
-    <button class="admin-btn admin-btn--danger admin-btn--sm" type="submit">Supprimer la commande</button>
-  </form>
+  <div class="admin-card__head"><h2 class="admin-card__title" style="color:#f87171">Zone sensible</h2></div>
+  <?php if ($isArchived): ?>
+    <p class="admin-card__sub">Commande archivée : masquée des listes, historique et CA conservés.</p>
+    <form method="post" action="<?= Url::admin('orders/' . (int) $order['id'] . '/unarchive') ?>">
+      <?= Security::csrfField() ?>
+      <button class="admin-btn admin-btn--ghost admin-btn--sm" type="submit">↩ Restaurer la commande</button>
+    </form>
+  <?php else: ?>
+    <p class="admin-card__sub">L'archivage retire la commande des vues actives sans effacer l'historique ni le chiffre d'affaires. Aucune suppression définitive n'est possible.</p>
+    <form method="post" action="<?= Url::admin('orders/' . (int) $order['id'] . '/archive') ?>"
+          data-confirm="Archiver la commande <?= Security::e((string) $order['reference']) ?> ?">
+      <?= Security::csrfField() ?>
+      <button class="admin-btn admin-btn--danger admin-btn--sm" type="submit">📦 Archiver la commande</button>
+    </form>
+  <?php endif; ?>
 </div>

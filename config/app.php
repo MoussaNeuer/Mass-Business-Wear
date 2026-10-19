@@ -8,10 +8,13 @@ $root = dirname(__DIR__);
 
 Env::load($root . '/.env');
 
+// S4 : en production, le debug est TOUJOURS coupé quel que soit APP_DEBUG
+$env = Env::get('APP_ENV', 'production');
+
 return [
     'name' => Env::get('APP_NAME', 'MASS BUSINESS WEAR'),
-    'env' => Env::get('APP_ENV', 'production'),
-    'debug' => Env::bool('APP_DEBUG', false),
+    'env' => $env,
+    'debug' => $env === 'production' ? false : Env::bool('APP_DEBUG', false),
     'url' => rtrim(Env::get('APP_URL', 'http://localhost/mass-business-wear/public'), '/'),
     'timezone' => Env::get('APP_TIMEZONE', 'Africa/Dakar'),
     'root' => $root,

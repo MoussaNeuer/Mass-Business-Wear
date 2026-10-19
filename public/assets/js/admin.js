@@ -58,6 +58,17 @@
     }
   });
 
+  /* ---------- Confirmation formulaires data-confirm (submit) ---------- */
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (form.tagName !== 'FORM' || !form.hasAttribute('data-confirm')) return;
+    var msg = form.getAttribute('data-confirm');
+    if (msg && !window.confirm(msg)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+
   /* ---------- Filtres admin : submit auto au changement ---------- */
   document.querySelectorAll('[data-auto-submit]').forEach(function (el) {
     el.addEventListener('change', function () {

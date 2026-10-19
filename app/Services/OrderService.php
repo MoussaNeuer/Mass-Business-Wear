@@ -130,14 +130,15 @@ final class OrderService
                     $size = $variant['size'];
                     $color = $variant['color'];
                 } else {
-                    // Produit sans variante : stock total
-                    $totalStock = (int) Database::value(
-                        'SELECT COALESCE(SUM(stock), 0) FROM product_variants WHERE product_id = ? AND is_active = 1',
+                    // Sans variante on ne sait pas quel stock décrémenter : refus.
+                    // (Le parcours normal envoie toujours variant_id depuis la fiche produit.)
+                    $hasVariants = (int) Database::value(
+                        'SELECT COUNT(*) FROM product_variants WHERE product_id = ? AND is_active = 1',
                         [$productId]
                     );
-                    if ($totalStock < $qty) {
-                        throw new RuntimeException('Stock insuffisant pour ' . $product['name'] . '.');
-                    }
+                    throw new RuntimeException($hasVariants > 0
+                        ? 'Choisissez une taille / couleur pour ' . $product['name'] . '.'
+                        : 'Ce produit n\'est plus disponible.');
                 }
 
                 $lineTotal = $unitPrice * $qty;

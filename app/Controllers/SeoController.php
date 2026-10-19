@@ -33,8 +33,8 @@ final class SeoController
         $urls = [];
 
         // Pages statiques
-        foreach (['', 'shop', 'contact'] as $p) {
-            $urls[] = ['loc' => $base . '/' . ltrim($p, '/'), 'changefreq' => 'daily', 'priority' => $p === '' ? '1.0' : '0.7'];
+        foreach (['', 'shop', 'contact', 'about', 'legal/terms', 'legal/privacy'] as $p) {
+            $urls[] = ['loc' => $base . '/' . ltrim($p, '/'), 'changefreq' => 'monthly', 'priority' => $p === '' ? '1.0' : ($p === 'shop' ? '0.9' : '0.5')];
         }
 
         // Catégories actives

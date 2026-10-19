@@ -9,7 +9,6 @@ use App\Helpers\Response;
 use App\Helpers\Security;
 use App\Helpers\Url;
 use App\Helpers\View;
-use App\Middleware\RateLimit;
 use App\Repositories\AdminRepository;
 use App\Repositories\LogRepository;
 use App\Repositories\LoginAttemptRepository;

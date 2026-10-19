@@ -8,6 +8,7 @@ CREATE DATABASE IF NOT EXISTS mbw CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_
 USE mbw;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS order_images;
 DROP TABLE IF EXISTS order_status_history;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS stock_movements;
@@ -18,6 +19,7 @@ DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS settings;
+DROP TABLE IF EXISTS shipping_zones;
 DROP TABLE IF EXISTS admin_logs;
 DROP TABLE IF EXISTS login_attempts;
 DROP TABLE IF EXISTS admins;
@@ -154,6 +156,16 @@ CREATE TABLE order_status_history (
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE SET NULL,
   INDEX idx_order (order_id, created_at)
+) ENGINE=InnoDB;
+
+-- Photos de référence jointes par le client à sa commande (Sprint C)
+CREATE TABLE order_images (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id INT UNSIGNED NOT NULL,
+  file VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  INDEX idx_order (order_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE stock_movements (

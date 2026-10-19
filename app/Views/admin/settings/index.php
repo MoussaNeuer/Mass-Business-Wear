@@ -128,3 +128,15 @@ use App\Helpers\Url;
     </form>
   </details>
 </div>
+
+<!-- --------------------------------------------------------- Outils -->
+<div class="admin-card">
+  <div class="admin-card__head">
+    <h2 class="admin-card__title">Outils</h2>
+  </div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+    <a class="admin-btn admin-btn--dark admin-btn--sm" href="<?= Url::admin('logs') ?>">📜 Journal d'activité</a>
+    <a class="admin-btn admin-btn--dark admin-btn--sm" href="<?= Url::admin('stats') ?>">📊 Statistiques</a>
+    <a class="admin-btn admin-btn--dark admin-btn--sm" href="<?= Url::admin('products?sort=stock') ?>">📦 Stock faible</a>
+  </div>
+</div>

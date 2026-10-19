@@ -18,6 +18,8 @@ final class OrderService
 {
     public const MAX_ITEMS = 30;
     public const MAX_QTY = 20;
+    /** Photos de référence jointes à la commande (Sprint C). */
+    public const MAX_IMAGES = 3;
 
     /**
      * @param array{
@@ -25,9 +27,10 @@ final class OrderService
      *   items:list<array{product_id:int,variant_id?:int|null,quantity:int}>
      * } $payload
      * @param ?string $idempotencyKey
-     * @return array{reference:string, whatsapp_url:string, total:int, shipping:int, subtotal:int}
+     * @param list<array{name:string,type:string,tmp_name:string,error:int,size:int}> $imageFiles
+     * @return array{reference:string, whatsapp_url:string, total:int, shipping:int, subtotal:int, images_count?:int}
      */
-    public static function create(array $payload, ?string $idempotencyKey = null): array
+    public static function create(array $payload, ?string $idempotencyKey = null, array $imageFiles = []): array
     {
         $name = trim((string) ($payload['name'] ?? ''));
         $phone = Security::normalizePhone((string) ($payload['phone'] ?? ''));
@@ -50,6 +53,21 @@ final class OrderService
         }
         if (!is_array($items) || $items === [] || count($items) > self::MAX_ITEMS) {
             throw new RuntimeException('Panier vide ou trop d\'articles.');
+        }
+
+        // Photos de référence (Sprint C) : optionnelles, jamais bloquantes.
+        // On valide d'abord SANS rien écrire, puis on persiste après le commit.
+        $validImages = [];
+        foreach (array_slice($imageFiles, 0, self::MAX_IMAGES) as $file) {
+            if (!is_array($file)) {
+                continue;
+            }
+            try {
+                ImageService::validate($file);
+                $validImages[] = $file;
+            } catch (RuntimeException) {
+                // photo refusée : la commande passe quand même sans elle
+            }
         }
 
         // Idempotence : même clé → même commande (retry réseau sans double)
@@ -75,11 +93,12 @@ final class OrderService
                     'shipping' => (int) $existing['shipping'],
                     'subtotal' => (int) $existing['subtotal'],
                     'duplicate' => true,
+                    'images_count' => 0,
                 ];
             }
         }
 
-        return Database::transaction(static function () use ($name, $phone, $zone, $address, $note, $items, $idempotencyKey): array {
+        $result = Database::transaction(static function () use ($name, $phone, $zone, $address, $note, $items, $idempotencyKey): array {
             // Verrouillage des lignes de stock pour éviter la double décrémentation
             $resolved = [];
             $subtotal = 0;
@@ -224,6 +243,7 @@ final class OrderService
 
             return [
                 'reference' => $reference,
+                'order_id' => $orderId,
                 'whatsapp_url' => WhatsAppService::orderLink(
                     $reference,
                     $name,
@@ -239,6 +259,28 @@ final class OrderService
                 'duplicate' => false,
             ];
         });
+
+        // Photos de référence (Sprint C) : écriture APRÈS le commit —
+        // une image refusée/échouée ne fait jamais rater la commande.
+        $saved = 0;
+        $orderId = (int) ($result['order_id'] ?? 0);
+        if ($orderId > 0 && $validImages !== []) {
+            foreach ($validImages as $file) {
+                try {
+                    $name = ImageService::saveOrderImage($file);
+                    Database::query(
+                        'INSERT INTO order_images (order_id, file) VALUES (?, ?)',
+                        [$orderId, $name]
+                    );
+                    $saved++;
+                } catch (\Throwable $e) {
+                    error_log('[order-image] ' . $e->getMessage());
+                }
+            }
+        }
+        $result['images_count'] = $saved;
+
+        return $result;
     }
 
     private static function shippingForZone(string $zone): int

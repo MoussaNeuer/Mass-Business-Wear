@@ -164,6 +164,135 @@
   transform: scale(.88);
 }
 
+/* Badge « nouvelles commandes » sur la bottom-nav */
+.admin-bottomnav__badge {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  margin-left: 6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  background: var(--mbw-red, #D40000);
+  color: #fff;
+  font-size: .58rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px #0A0A0A;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------- FAB (Floating Action Button) */
+
+.admin-fab {
+  position: fixed;
+  right: 14px;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 14px);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 48px;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 99px;
+  background: var(--mbw-red, #D40000);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(212, 0, 0, .38);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.admin-fab:active {
+  transform: scale(.96);
+  box-shadow: 0 4px 12px rgba(212, 0, 0, .3);
+}
+.admin-fab svg { width: 18px; height: 18px; }
+
+/* --------------------------------------------------------- Stepper statut (commande) */
+
+.admin-stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin: .2rem 0 .4rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.admin-stepper::-webkit-scrollbar { display: none; }
+
+.admin-stepper__step {
+  flex: 1 0 auto;
+  min-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .3rem;
+  position: relative;
+  text-align: center;
+}
+
+.admin-stepper__dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #1a1a1d;
+  border: 2px solid #374151;
+  color: #6b7280;
+  font-size: .62rem;
+  font-weight: 800;
+  z-index: 1;
+}
+
+.admin-stepper__step.is-done .admin-stepper__dot {
+  background: var(--mbw-red, #D40000);
+  border-color: var(--mbw-red, #D40000);
+  color: #fff;
+}
+.admin-stepper__step.is-current .admin-stepper__dot {
+  border-color: var(--mbw-red, #D40000);
+  color: #fff;
+  background: #2a0a0a;
+  box-shadow: 0 0 0 4px rgba(212, 0, 0, .18);
+}
+.admin-stepper__step.is-cancelled .admin-stepper__dot {
+  background: #3f1212;
+  border-color: #7f1d1d;
+  color: #f87171;
+}
+
+.admin-stepper__label {
+  font-size: .58rem;
+  color: #6b7280;
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 62px;
+}
+.admin-stepper__step.is-done .admin-stepper__label,
+.admin-stepper__step.is-current .admin-stepper__label {
+  color: #e5e7eb;
+}
+
+.admin-stepper__step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: calc(50% + 14px);
+  right: calc(-50% + 14px);
+  height: 2px;
+  background: #374151;
+}
+.admin-stepper__step.is-done:not(:last-child)::after {
+  background: var(--mbw-red, #D40000);
+}
+
 /* --------------------------------------------------------- Cards */
 
 .admin-card {
@@ -790,6 +919,192 @@
   cursor: pointer;
   display: grid;
   place-items: center;
+}
+
+.admin-imggrid__actions button.is-danger { color: #f87171; }
+
+.admin-imggrid__star {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--mbw-red, #D40000);
+  color: #fff;
+  font-size: .65rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .5);
+}
+
+/* Vignettes drag & drop (réordonnancement) */
+.admin-imggrid__item[draggable="true"] { cursor: grab; touch-action: none; }
+.admin-imggrid__item.is-dragging { opacity: .4; }
+.admin-imggrid__item.is-over { outline: 2px dashed #fff; outline-offset: 2px; }
+
+/* --------------------------------------------------------- Upload dropzone (Sprint B) */
+
+.admin-dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+  padding: 1.4rem 1rem;
+  border: 2px dashed rgba(255, 255, 255, .22);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .03);
+  text-align: center;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+
+.admin-dropzone.is-dragover {
+  border-color: var(--mbw-red, #D40000);
+  background: rgba(212, 0, 0, .08);
+  transform: scale(1.01);
+}
+
+.admin-dropzone.is-loading { pointer-events: none; opacity: .7; }
+
+.admin-dropzone__icon {
+  width: 42px;
+  height: 42px;
+  color: #9ca3af;
+}
+
+.admin-dropzone__hint {
+  margin: 0;
+  font-size: .85rem;
+  color: #e5e7eb;
+}
+
+.admin-dropzone__or {
+  margin: 0;
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #6b7280;
+}
+
+.admin-dropzone__btns {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: .15rem;
+}
+
+.admin-dropzone__btns .admin-btn { min-height: 44px; }
+
+.admin-dropzone__info {
+  margin-top: .3rem;
+  font-size: .68rem;
+  color: #6b7280;
+  max-width: 34ch;
+  line-height: 1.35;
+}
+
+.admin-dropzone__progress {
+  width: 100%;
+  max-width: 240px;
+  height: 5px;
+  margin-top: .4rem;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .1);
+  overflow: hidden;
+}
+
+.admin-dropzone__bar {
+  width: 15%;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--mbw-red, #D40000), #ff4d4d);
+  transition: width .3s ease;
+}
+
+.admin-dropzone[hidden],
+.admin-dropzone__progress[hidden] { display: none; }
+
+/* Grille prix mobile : côte à côte >= 420px */
+.admin-pricegrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .65rem;
+}
+
+/* --------------------------------------------------------- Photos client (commande) */
+
+.admin-orderimgs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: .5rem;
+}
+
+.admin-orderimgs__item {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1a1a1d;
+  cursor: zoom-in;
+}
+
+.admin-orderimgs__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.admin-orderimgs__zoom {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .65);
+  color: #fff;
+  font-size: .7rem;
+}
+
+/* Lightbox plein écran */
+.admin-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, .92);
+}
+
+.admin-lightbox[hidden] { display: none; }
+
+.admin-lightbox img {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .6);
+}
+
+.admin-lightbox__close {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
 }
 
 /* --------------------------------------------------------- Variant rows */

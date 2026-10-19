@@ -11,6 +11,7 @@ use App\Controllers\Admin\Orders;
 use App\Controllers\Admin\Products;
 use App\Controllers\Admin\Settings;
 use App\Controllers\Admin\Stats;
+use App\Controllers\Admin\Stock;
 use App\Helpers\Router;
 use App\Middleware\AdminAuth;
 
@@ -35,6 +36,7 @@ $router->group('/admin', function (Router $r) {
 
     // Produits
     $r->get('/products', [Products::class, 'index'], [AdminAuth::class]);
+    $r->get('/stock', [Stock::class, 'index'], [AdminAuth::class]);
     $r->get('/products/create', [Products::class, 'create'], [AdminAuth::class]);
     $r->post('/products', [Products::class, 'store'], [AdminAuth::class]);
     $r->get('/products/{id:\d+}/edit', [Products::class, 'edit'], [AdminAuth::class]);
@@ -46,6 +48,7 @@ $router->group('/admin', function (Router $r) {
     $r->post('/products/{id:\d+}/variants/{vid:\d+}', [Products::class, 'variantUpdate'], [AdminAuth::class]);
     $r->post('/products/{id:\d+}/variants/{vid:\d+}/delete', [Products::class, 'variantDestroy'], [AdminAuth::class]);
     $r->post('/products/{id:\d+}/images', [Products::class, 'imageUpload'], [AdminAuth::class]);
+    $r->post('/products/{id:\d+}/images/sort', [Products::class, 'imageSort'], [AdminAuth::class]);
     $r->post('/products/{id:\d+}/images/{iid:\d+}/delete', [Products::class, 'imageDestroy'], [AdminAuth::class]);
     $r->post('/products/{id:\d+}/images/{iid:\d+}/primary', [Products::class, 'imagePrimary'], [AdminAuth::class]);
 

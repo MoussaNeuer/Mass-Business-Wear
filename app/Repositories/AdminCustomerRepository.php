@@ -74,7 +74,7 @@ final class AdminCustomerRepository
             "SELECT o.id, o.reference, o.total, o.status, o.zone, o.created_at,
                     (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS items_count
              FROM orders o
-             WHERE o.customer_id = ?
+             WHERE o.customer_id = ? AND o.archived_at IS NULL
              ORDER BY o.created_at DESC
              LIMIT " . max(1, min(100, $limit)),
             [$customerId]

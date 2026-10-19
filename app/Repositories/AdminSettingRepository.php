@@ -32,6 +32,12 @@ final class AdminSettingRepository
         return Database::all('SELECT * FROM shipping_zones ORDER BY sort_order, name');
     }
 
+    public static function zone(int $id): ?array
+    {
+        $row = Database::one('SELECT * FROM shipping_zones WHERE id = ?', [$id]);
+        return $row === null ? null : (array) $row;
+    }
+
     public static function createZone(array $d): int
     {
         Database::query(

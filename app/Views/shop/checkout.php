@@ -58,6 +58,17 @@ $currency = $currency ?? 'FCFA';
         <label for="co-note">Note (optionnel)</label>
         <textarea id="co-note" name="note" rows="2" placeholder="Instructions particulières…"></textarea>
       </div>
+
+      <div class="field mb-3">
+        <label for="co-photos">Photo de référence (optionnel)</label>
+        <input id="co-photos" type="file" accept="image/jpeg,image/png,image/webp"
+               multiple capture="environment" hidden>
+        <button type="button" id="co-photos-btn" class="btn-mbw btn-ghost btn-block">
+          📷 Ajouter une photo (jusqu'à 3)
+        </button>
+        <div id="co-photos-list" class="co-photos"></div>
+        <small class="text-muted">Ex. : le modèle, la couleur souhaitée ou votre référence exacte. JPEG/PNG/WebP, 2 Mo max.</small>
+      </div>
     </form>
 
     <div class="card-mbw mt-3">
@@ -200,6 +211,68 @@ $currency = $currency ?? 'FCFA';
       };
     }
 
+    /* ---------- Photos de référence (Sprint C) ---------- */
+    var MAX_PHOTOS = 3;
+    var MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+    var photoFiles = [];
+    var photoInput = document.getElementById('co-photos');
+    var photoBtn = document.getElementById('co-photos-btn');
+    var photoList = document.getElementById('co-photos-list');
+
+    function renderPhotos() {
+      if (!photoList) return;
+      photoList.innerHTML = '';
+      photoFiles.forEach(function (f, i) {
+        var wrap = document.createElement('div');
+        wrap.className = 'co-photos__item';
+        var img = document.createElement('img');
+        img.alt = '';
+        img.src = URL.createObjectURL(f);
+        img.onload = function () { URL.revokeObjectURL(img.src); };
+        var rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'co-photos__rm';
+        rm.setAttribute('aria-label', 'Retirer la photo');
+        rm.textContent = '✕';
+        rm.addEventListener('click', function () {
+          photoFiles.splice(i, 1);
+          renderPhotos();
+        });
+        wrap.appendChild(img);
+        wrap.appendChild(rm);
+        photoList.appendChild(wrap);
+      });
+      if (photoBtn) {
+        photoBtn.textContent = photoFiles.length
+          ? '📷 ' + photoFiles.length + '/3 photo(s) — toucher pour ajouter'
+          : '📷 Ajouter une photo (jusqu\'à 3)';
+      }
+    }
+
+    function addPhotos(fileList) {
+      var added = 0;
+      var rejected = 0;
+      Array.prototype.forEach.call(fileList || [], function (f) {
+        if (photoFiles.length >= MAX_PHOTOS) { rejected++; return; }
+        if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { rejected++; return; }
+        if (f.size > MAX_PHOTO_BYTES) { rejected++; return; }
+        photoFiles.push(f);
+        added++;
+      });
+      if (rejected && !added) showError('Photos refusées : JPEG/PNG/WebP uniquement, 2 Mo max, 3 au total.');
+      else if (rejected) showError(' certaines photos refusées : JPEG/PNG/WebP, 2 Mo max, 3 au total.');
+      else showError('');
+      renderPhotos();
+    }
+
+    if (photoBtn && photoInput) {
+      photoBtn.addEventListener('click', function () { photoInput.click(); });
+      photoInput.addEventListener('change', function () {
+        if (photoInput.files && photoInput.files.length) addPhotos(photoInput.files);
+        photoInput.value = '';
+      });
+    }
+
     if (submitBtn) {
       submitBtn.addEventListener('click', function () {
         if (busy) return;
@@ -212,17 +285,43 @@ $currency = $currency ?? 'FCFA';
 
         var csrf = (ui && ui.csrfToken) ? ui.csrfToken() : '';
         var base = (window.MBW_BASE || '/') + 'api/orders';
+        var payload = collectPayload();
 
-        fetch(base, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrf,
-            'X-Idempotency-Key': idemKey,
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(collectPayload())
-        }).then(function (r) {
+        var req;
+        if (photoFiles.length) {
+          // Multipart : champs + photos de référence (Sprint C)
+          var fd = new FormData();
+          fd.append('name', payload.name);
+          fd.append('phone', payload.phone);
+          fd.append('zone', payload.zone);
+          fd.append('address', payload.address);
+          fd.append('note', payload.note);
+          fd.append('items', JSON.stringify(payload.items));
+          fd.append('idempotency_key', payload.idempotency_key);
+          photoFiles.forEach(function (f) { fd.append('images[]', f, f.name || 'photo.jpg'); });
+          req = {
+            method: 'POST',
+            headers: {
+              'X-CSRF-Token': csrf,
+              'X-Idempotency-Key': idemKey,
+              'Accept': 'application/json'
+            },
+            body: fd
+          };
+        } else {
+          req = {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': csrf,
+              'X-Idempotency-Key': idemKey,
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          };
+        }
+
+        fetch(base, req).then(function (r) {
           return r.json().then(function (body) {
             return { ok: r.ok, status: r.status, body: body };
           });

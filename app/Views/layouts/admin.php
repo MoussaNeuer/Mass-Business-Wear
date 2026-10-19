@@ -6,6 +6,7 @@
  * @var string $title
  * @var string $adminLogin
  * @var string $currentPath
+ * @var int $newOrdersCount
  * @var list<array{m:string,t:string}> $flash
  */
 use App\Helpers\Security;
@@ -24,6 +25,12 @@ $active = static function (array $item) use ($path): bool {
         return true;
     }
     return false;
+};
+
+// Versionnement assets (Cache-Control 86400) : ?v=timestamp de dernière modif
+$assetV = static function (string $path): string {
+    $file = dirname(__DIR__, 3) . '/public/assets/' . $path;
+    return is_file($file) ? '?v=' . (int) filemtime($file) : '';
 };
 ?>
 <!DOCTYPE html>
@@ -44,9 +51,9 @@ $active = static function (array $item) use ($path): bool {
 <?= Security::csrfMeta() ?>
 <script>window.MBW_BASE = <?= json_encode(rtrim(\App\Helpers\BaseUrl::url('/'), '/') . '/', JSON_UNESCAPED_SLASHES) ?>;</script>
 <link rel="stylesheet" href="<?= Url::asset('vendor/bootstrap/css/bootstrap.min.css') ?>">
-<link rel="stylesheet" href="<?= Url::asset('css/tokens.css') ?>">
-<link rel="stylesheet" href="<?= Url::asset('css/app.css') ?>">
-<link rel="stylesheet" href="<?= Url::asset('css/admin.css') ?>">
+<link rel="stylesheet" href="<?= Url::asset('css/tokens.css') ?><?= $assetV('css/tokens.css') ?>">
+<link rel="stylesheet" href="<?= Url::asset('css/app.css') ?><?= $assetV('css/app.css') ?>">
+<link rel="stylesheet" href="<?= Url::asset('css/admin.css') ?><?= $assetV('css/admin.css') ?>">
 </head>
 <body class="theme-dark admin-body">
 
@@ -81,11 +88,16 @@ $active = static function (array $item) use ($path): bool {
 </main>
 
 <nav class="admin-bottomnav" aria-label="Navigation admin">
-  <?php foreach ($nav as $item): ?>
+  <?php foreach ($nav as $i => $item): ?>
     <?php $on = $active($item); ?>
     <a href="<?= $item['url'] ?>" class="<?= $on ? 'is-active' : '' ?>" <?= $on ? 'aria-current="page"' : '' ?>>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="<?= $item['icon'] ?>"/></svg>
       <span><?= Security::e($item['label']) ?></span>
+      <?php if ($i === 1 && (int) ($newOrdersCount ?? 0) > 0): ?>
+        <span class="admin-bottomnav__badge" aria-label="<?= (int) $newOrdersCount ?> commande(s) en attente">
+          <?= (int) $newOrdersCount > 99 ? '99+' : (int) $newOrdersCount ?>
+        </span>
+      <?php endif; ?>
     </a>
   <?php endforeach; ?>
 </nav>
@@ -100,7 +112,8 @@ $active = static function (array $item) use ($path): bool {
 </div>
 <?php endif; ?>
 
-<script src="<?= Url::asset('js/admin.js') ?>" defer></script>
-<script src="<?= Url::asset('js/admin-pwa.js') ?>" defer></script>
+<script src="<?= Url::asset('js/admin.js') ?><?= $assetV('js/admin.js') ?>" defer></script>
+<script src="<?= Url::asset('js/admin-upload.js') ?><?= $assetV('js/admin-upload.js') ?>" defer></script>
+<script src="<?= Url::asset('js/admin-pwa.js') ?><?= $assetV('js/admin-pwa.js') ?>" defer></script>
 </body>
 </html>

@@ -40,6 +40,7 @@ final class Orders extends BaseAdmin
             'order' => $order,
             'items' => AdminOrderRepository::items($id),
             'history' => AdminOrderRepository::history($id),
+            'clientImages' => AdminOrderRepository::images($id),
             'statusLabels' => AdminOrderRepository::STATUS_LABELS,
             'allowedStatuses' => AdminOrderRepository::TRANSITIONS[(string) $order['status']] ?? [],
             'currency' => SettingRepository::currency(),
@@ -74,6 +75,11 @@ final class Orders extends BaseAdmin
         $order = AdminOrderRepository::find($id);
         if ($order === null) {
             Response::abort(404);
+        }
+        // m13 : message clair si la commande n'est plus en attente
+        if ((string) $order['status'] !== 'NEW') {
+            self::backError('Seules les commandes en attente (NEW) peuvent être confirmées. Statut actuel : '
+                . (AdminOrderRepository::STATUS_LABELS[(string) $order['status']] ?? $order['status']) . '.');
         }
         $err = AdminOrderRepository::updateStatus($id, 'CONFIRMED', 'Confirmée en 1 tap', $this->adminId());
         if ($err !== null) {

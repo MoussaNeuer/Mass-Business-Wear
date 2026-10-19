@@ -24,6 +24,7 @@ $statusBadge = static fn (string $s): string => 'admin-badge admin-badge--' . $s
     <p><?= (int) $total ?> produit(s) au total</p>
   </div>
   <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+    <a class="admin-btn admin-btn--ghost admin-btn--sm" href="<?= Url::admin('stock') ?>">Stock</a>
     <a class="admin-btn admin-btn--ghost admin-btn--sm" href="<?= Url::admin('categories') ?>">Catég.</a>
     <a class="admin-btn admin-btn--primary admin-btn--sm" href="<?= Url::admin('products/create') ?>">+ Nouveau</a>
   </div>
@@ -60,6 +61,10 @@ $statusBadge = static fn (string $s): string => 'admin-badge admin-badge--' . $s
     <a class="admin-btn admin-btn--primary" href="<?= Url::admin('products/create') ?>">Créer un produit</a>
   </div>
 <?php else: ?>
+  <a class="admin-fab" href="<?= Url::admin('products/create') ?>">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    Nouveau
+  </a>
   <?php foreach ($items as $p): ?>
     <?php $stock = (int) $p['stock']; ?>
     <a class="admin-card admin-card--link" href="<?= Url::admin('products/' . (int) $p['id'] . '/edit') ?>" style="display:flex;gap:.75rem;align-items:center">
@@ -75,8 +80,12 @@ $statusBadge = static fn (string $s): string => 'admin-badge admin-badge--' . $s
         </div>
         <div class="admin-row__meta">
           <?= Security::e((string) ($p['category_name'] ?? '—')) ?> ·
-          <?= number_format((int) $p['price'], 0, ',', ' ') ?> FCFA
-          <?php if ($p['promo_price'] !== null): ?> <s style="color:#6b7280"><?= number_format((int) $p['promo_price'], 0, ',', ' ') ?></s><?php endif; ?>
+          <?php if (!empty($p['promo_price'])): ?>
+            <strong style="color:#D40000"><?= number_format((int) $p['promo_price'], 0, ',', ' ') ?></strong>
+            <s style="color:#6b7280"><?= number_format((int) $p['price'], 0, ',', ' ') ?></s>
+          <?php else: ?>
+            <?= number_format((int) $p['price'], 0, ',', ' ') ?> FCFA
+          <?php endif; ?>
         </div>
       </div>
       <div style="text-align:right;flex:none">

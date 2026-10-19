@@ -97,7 +97,22 @@ final class AdminOrderRepository
     public static function items(int $orderId): array
     {
         return Database::all(
-            'SELECT * FROM order_items WHERE order_id = ? ORDER BY id',
+            'SELECT oi.*,
+                    (SELECT pi.file FROM product_images pi
+                      WHERE pi.product_id = oi.product_id
+                      ORDER BY pi.sort_order, pi.id LIMIT 1) AS image_file
+             FROM order_items oi
+             WHERE oi.order_id = ?
+             ORDER BY oi.id',
+            [$orderId]
+        );
+    }
+
+    /** Photos de référence jointes par le client (Sprint C). */
+    public static function images(int $orderId): array
+    {
+        return Database::all(
+            'SELECT id, file, created_at FROM order_images WHERE order_id = ? ORDER BY id',
             [$orderId]
         );
     }
@@ -168,8 +183,12 @@ final class AdminOrderRepository
                 }
             }
 
-            // Ré-activation après annulation : re-décrémenter si le stock le permet
+            // Ré-activation après annulation : re-décrémenter si le stock le permet.
+            // C3 : PRÉ-VÉRIFICATION de toutes les variantes AVANT toute mutation —
+            // un return en cours de boucle laisserait la transaction commiter des
+            // décréments partiels sans changer le statut de la commande.
             if ($old === 'CANCELLED' && $newStatus !== 'CANCELLED') {
+                $shortages = [];
                 foreach ($lines as $line) {
                     if ($line['variant_id'] === null) {
                         continue;
@@ -181,9 +200,18 @@ final class AdminOrderRepository
                         [$vid]
                     );
                     if ($stock < $qty) {
-                        return 'Stock insuffisant pour réactiver cette commande (variante manquante quantité).'
-                            . ' Stock actuel : ' . $stock . ', requis : ' . $qty . '.';
+                        $shortages[] = 'variante #' . $vid . ' (stock ' . $stock . ', requis ' . $qty . ')';
                     }
+                }
+                if ($shortages !== []) {
+                    return 'Stock insuffisant pour réactiver cette commande : ' . implode(', ', $shortages) . '.';
+                }
+                foreach ($lines as $line) {
+                    if ($line['variant_id'] === null) {
+                        continue;
+                    }
+                    $vid = (int) $line['variant_id'];
+                    $qty = (int) $line['quantity'];
                     Database::query('UPDATE product_variants SET stock = stock - ? WHERE id = ?', [$qty, $vid]);
                     $after = (int) Database::value('SELECT stock FROM product_variants WHERE id = ?', [$vid]);
                     Database::query(

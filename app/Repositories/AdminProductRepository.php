@@ -212,8 +212,19 @@ final class AdminProductRepository
         );
     }
 
-    public static function addImage(int $productId, string $file, int $sort = 0): int
+    /**
+     * Ajoute une image. M7 : si $sort est null, la nouvelle image passe en fin
+     * de liste (max(sort_order)+1) — l'ancien défaut 0 la marquait « primaire ».
+     */
+    public static function addImage(int $productId, string $file, ?int $sort = null): int
     {
+        if ($sort === null) {
+            $max = (int) Database::value(
+                'SELECT COALESCE(MAX(sort_order), 0) FROM product_images WHERE product_id = ?',
+                [$productId]
+            );
+            $sort = $max + 1;
+        }
         Database::query(
             'INSERT INTO product_images (product_id, file, sort_order) VALUES (?, ?, ?)',
             [$productId, $file, $sort]
@@ -224,6 +235,24 @@ final class AdminProductRepository
     public static function deleteImage(int $id): void
     {
         Database::query('DELETE FROM product_images WHERE id = ?', [$id]);
+    }
+
+    /**
+     * Applique un ordre explicite (drag & drop) : 0..n-1 dans l'ordre donné.
+     * Convention « primaire » = plus petit sort_order (donc le 1er de la liste).
+     */
+    public static function reorderImages(int $productId, array $orderedIds): void
+    {
+        Database::transaction(static function () use ($productId, $orderedIds): void {
+            $i = 0;
+            foreach ($orderedIds as $imageId) {
+                Database::query(
+                    'UPDATE product_images SET sort_order = ? WHERE id = ? AND product_id = ?',
+                    [$i, (int) $imageId, $productId]
+                );
+                $i++;
+            }
+        });
     }
 
     public static function setPrimaryImage(int $productId, int $imageId): void
@@ -243,6 +272,61 @@ final class AdminProductRepository
             }
             Database::query('UPDATE product_images SET sort_order = ? WHERE id = ?', [$min - 1, $imageId]);
         });
+    }
+
+    // ---------------------------------------------------------------- Stock
+
+    public const LOW_STOCK = 5;
+
+    /**
+     * Liste des variantes pour la page Stock (Sprint D).
+     *
+     * @param array{q?:string,low?:bool} $f
+     * @return list<array>
+     */
+    public static function stockList(array $f): array
+    {
+        $where = 'WHERE v.is_active = 1';
+        $params = [];
+        $q = trim((string) ($f['q'] ?? ''));
+        if ($q !== '') {
+            $where .= ' AND (p.name LIKE ? OR v.size LIKE ? OR v.color LIKE ? OR v.sku LIKE ?)';
+            $like = '%' . $q . '%';
+            array_push($params, $like, $like, $like, $like);
+        }
+        if (!empty($f['low'])) {
+            $where .= ' AND v.stock <= ' . self::LOW_STOCK;
+        }
+        return Database::all(
+            "SELECT v.id, v.product_id, v.size, v.color, v.sku, v.stock, v.price_override,
+                    p.name AS product_name, p.status AS product_status,
+                    (SELECT pi.file FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.sort_order, pi.id LIMIT 1) AS image_file
+             FROM product_variants v
+             JOIN products p ON p.id = v.product_id
+             {$where}
+             ORDER BY v.stock ASC, p.name, v.size",
+            $params
+        );
+    }
+
+    public static function lowStockCount(): int
+    {
+        return (int) Database::value(
+            'SELECT COUNT(*) FROM product_variants WHERE is_active = 1 AND stock <= ' . self::LOW_STOCK
+        );
+    }
+
+    /** Derniers mouvements de stock (journal). */
+    public static function recentMovements(int $limit = 15): array
+    {
+        return Database::all(
+            'SELECT m.*, v.size, v.color, p.name AS product_name
+             FROM stock_movements m
+             JOIN product_variants v ON v.id = m.variant_id
+             JOIN products p ON p.id = v.product_id
+             ORDER BY m.id DESC
+             LIMIT ' . max(1, min(50, $limit))
+        );
     }
 
     // -------------------------------------------------------------- Stats

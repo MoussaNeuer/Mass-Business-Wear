@@ -1,6 +1,7 @@
 <?php
 /**
- * Formulaire produit (create / edit) + variantes + images.
+ * Formulaire produit (create / edit) + variantes + images (Sprint B).
+ * M5 : les valeurs saisies ($_POST) priment sur $product après un échec de validation.
  * @var ?array $product
  * @var array  $categories
  */
@@ -12,6 +13,26 @@ $isNew = $product === null;
 $action = $isNew ? Url::admin('products') : Url::admin('products/' . (int) $product['id']);
 $variants = $isNew ? [] : AdminProductRepository::variants((int) $product['id']);
 $images = $isNew ? [] : AdminProductRepository::images((int) $product['id']);
+
+/** Valeur POST (saisie conservée) > produit existant > défaut. */
+$v = static function (string $key, string $default = '') use ($product): string {
+    if (isset($_POST[$key]) && is_scalar($_POST[$key])) {
+        return (string) $_POST[$key];
+    }
+    return isset($product[$key]) && $product[$key] !== null ? (string) $product[$key] : $default;
+};
+$vInt = static function (string $key, int $default = 0) use ($product): int {
+    if (isset($_POST[$key]) && is_scalar($_POST[$key]) && $_POST[$key] !== '') {
+        return (int) $_POST[$key];
+    }
+    return isset($product[$key]) && $product[$key] !== null ? (int) $product[$key] : $default;
+};
+$vChecked = static function (string $key) use ($product): bool {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        return isset($_POST[$key]);
+    }
+    return !empty($product[$key]);
+};
 ?>
 <div class="admin-pagehead">
   <div>
@@ -24,12 +45,12 @@ $images = $isNew ? [] : AdminProductRepository::images((int) $product['id']);
 <form method="post" action="<?= $action ?>" class="admin-card">
   <div class="admin-field">
     <label for="p-name">Nom *</label>
-    <input id="p-name" name="name" required maxlength="160" value="<?= Security::e((string) ($product['name'] ?? '')) ?>" placeholder="Ex. Sweat Capuche MBW">
+    <input id="p-name" name="name" required maxlength="160" value="<?= Security::e($v('name')) ?>" placeholder="Ex. Sweat Capuche MBW">
   </div>
 
   <div class="admin-field">
     <label for="p-slug">Slug (URL)</label>
-    <input id="p-slug" name="slug" maxlength="180" value="<?= Security::e((string) ($product['slug'] ?? '')) ?>" placeholder="auto si vide">
+    <input id="p-slug" name="slug" maxlength="180" value="<?= Security::e($v('slug')) ?>" placeholder="auto si vide">
     <small>Caractères minuscules, tirets. Généré depuis le nom si vide.</small>
   </div>
 
@@ -38,7 +59,7 @@ $images = $isNew ? [] : AdminProductRepository::images((int) $product['id']);
     <select id="p-cat" name="category_id">
       <option value="0">— Aucune —</option>
       <?php foreach ($categories as $c): ?>
-        <option value="<?= (int) $c['id'] ?>" <?= (int) ($product['category_id'] ?? 0) === (int) $c['id'] ? 'selected' : '' ?>>
+        <option value="<?= (int) $c['id'] ?>" <?= $vInt('category_id') === (int) $c['id'] ? 'selected' : '' ?>>
           <?= Security::e((string) $c['name']) ?>
         </option>
       <?php endforeach; ?>
@@ -47,17 +68,17 @@ $images = $isNew ? [] : AdminProductRepository::images((int) $product['id']);
 
   <div class="admin-field">
     <label for="p-desc">Description</label>
-    <textarea id="p-desc" name="description" rows="4" placeholder="Matière, coupe, entretien…"><?= Security::e((string) ($product['description'] ?? '')) ?></textarea>
+    <textarea id="p-desc" name="description" rows="4" placeholder="Matière, coupe, entretien…"><?= Security::e($v('description')) ?></textarea>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem">
+  <div class="admin-pricegrid">
     <div class="admin-field">
       <label for="p-price">Prix (FCFA) *</label>
-      <input id="p-price" name="price" type="number" min="1" required value="<?= (int) ($product['price'] ?? 0) ?: '' ?>">
+      <input id="p-price" name="price" type="number" inputmode="numeric" min="1" required value="<?= $vInt('price') ?: '' ?>">
     </div>
     <div class="admin-field">
       <label for="p-promo">Prix promo</label>
-      <input id="p-promo" name="promo_price" type="number" min="0" value="<?= $product['promo_price'] !== null ? (int) $product['promo_price'] : '' ?>" placeholder=" Vide = pas de promo">
+      <input id="p-promo" name="promo_price" type="number" inputmode="numeric" min="0" value="<?= $v('promo_price') ?>" placeholder="Vide = pas de promo">
     </div>
   </div>
 
@@ -65,13 +86,13 @@ $images = $isNew ? [] : AdminProductRepository::images((int) $product['id']);
     <label for="p-status">Statut</label>
     <select id="p-status" name="status">
       <?php foreach (['draft' => 'Brouillon', 'active' => 'Actif (visible)', 'archived' => 'Archivé'] as $val => $label): ?>
-        <option value="<?= $val ?>" <?= ($product['status'] ?? 'draft') === $val ? 'selected' : '' ?>><?= $label ?></option>
+        <option value="<?= $val ?>" <?= $v('status', 'draft') === $val ? 'selected' : '' ?>><?= $label ?></option>
       <?php endforeach; ?>
     </select>
   </div>
 
   <label class="admin-check">
-    <input type="checkbox" name="is_featured" value="1" <?= !empty($product['is_featured']) ? 'checked' : '' ?>>
+    <input type="checkbox" name="is_featured" value="1" <?= $vChecked('is_featured') ? 'checked' : '' ?>>
     Mis en avant sur l'accueil
   </label>
 
@@ -79,11 +100,11 @@ $images = $isNew ? [] : AdminProductRepository::images((int) $product['id']);
     <summary style="cursor:pointer;font-size:.82rem;color:#9ca3af;font-weight:700">SEO (optionnel)</summary>
     <div class="admin-field" style="margin-top:.6rem">
       <label for="p-seo-t">Titre SEO</label>
-      <input id="p-seo-t" name="seo_title" maxlength="160" value="<?= Security::e((string) ($product['seo_title'] ?? '')) ?>">
+      <input id="p-seo-t" name="seo_title" maxlength="160" value="<?= Security::e($v('seo_title')) ?>">
     </div>
     <div class="admin-field">
       <label for="p-seo-d">Description SEO</label>
-      <textarea id="p-seo-d" name="seo_description" rows="2" maxlength="255"><?= Security::e((string) ($product['seo_description'] ?? '')) ?></textarea>
+      <textarea id="p-seo-d" name="seo_description" rows="2" maxlength="255"><?= Security::e($v('seo_description')) ?></textarea>
     </div>
   </details>
 
@@ -97,43 +118,58 @@ $images = $isNew ? [] : AdminProductRepository::images((int) $product['id']);
 <!-- --------------------------------------------------------- Images -->
 <div class="admin-card">
   <div class="admin-card__head">
-    <h2 class="admin-card__title">Images</h2>
-    <span style="font-size:.75rem;color:#6b7280"><?= count($images) ?> image(s)</span>
+    <h2 class="admin-card__title">Photos</h2>
+    <span id="img-count" style="font-size:.75rem;color:#6b7280"><?= count($images) ?> photo(s)</span>
   </div>
 
-  <?php if ($images !== []): ?>
-    <div class="admin-imggrid">
-      <?php $minSort = $images[0]['sort_order'] ?? 0; foreach ($images as $img): $isPrimary = (int) $img['sort_order'] <= (int) $minSort; ?>
-        <div class="admin-imggrid__item <?= $isPrimary ? 'is-primary' : '' ?>">
-          <img src="<?= Url::upload('products/' . Security::e($img['file'])) ?>" alt="" loading="lazy">
-          <div class="admin-imggrid__actions">
-            <?php if (!$isPrimary): ?>
-              <form method="post" action="<?= Url::admin('products/' . (int) $product['id'] . '/images/' . (int) $img['id'] . '/primary') ?>" style="margin:0">
-                <button type="submit" title="Principale">★</button>
-              </form>
-            <?php else: ?>
-              <span style="display:grid;place-items:center;color:#fbbf24;font-size:.65rem;font-weight:800">★</span>
-            <?php endif; ?>
-            <form method="post" action="<?= Url::admin('products/' . (int) $product['id'] . '/images/' . (int) $img['id'] . '/delete') ?>" style="margin:0"
-                  data-confirm="Supprimer cette image ?">
-              <button type="submit" title="Supprimer" style="color:#f87171">✕</button>
-            </form>
-          </div>
-        </div>
-      <?php endforeach; ?>
-    </div>
-  <?php else: ?>
-    <p class="admin-card__sub" style="margin-bottom:.6rem">Aucune image. Ajoutez des photos (JPEG/PNG/WebP, max 2 Mo).</p>
-  <?php endif; ?>
+  <div id="img-dropzone" class="admin-dropzone"
+       data-product-id="<?= (int) $product['id'] ?>"
+       data-upload-url="<?= Url::admin('products/' . (int) $product['id'] . '/images') ?>"
+       data-sort-url="<?= Url::admin('products/' . (int) $product['id'] . '/images/sort') ?>"
+       data-primary-url-template="<?= Url::admin('products/' . (int) $product['id'] . '/images/{iid}/primary') ?>"
+       data-delete-url-template="<?= Url::admin('products/' . (int) $product['id'] . '/images/{iid}/delete') ?>">
+    <input type="file" id="img-input-camera" accept="image/jpeg,image/png,image/webp"
+           multiple capture="environment" hidden>
+    <input type="file" id="img-input-files" accept="image/jpeg,image/png,image/webp" multiple hidden>
 
-  <form method="post" action="<?= Url::admin('products/' . (int) $product['id'] . '/images') ?>" enctype="multipart/form-data" class="mt-3">
-    <div class="admin-field">
-      <label for="p-img">Ajouter une image</label>
-      <input id="p-img" type="file" name="image" accept="image/jpeg,image/png,image/webp" required data-preview="#img-preview">
-      <img id="img-preview" src="" alt="" style="display:none;max-width:120px;border-radius:10px;margin-top:.5rem">
+    <svg class="admin-dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+      <path d="M4 8h3l2-3h6l2 3h3v12H4V8z"/><circle cx="12" cy="13" r="4"/>
+    </svg>
+    <p class="admin-dropzone__hint"><strong>Glissez vos photos ici</strong></p>
+    <p class="admin-dropzone__or">ou choisissez</p>
+    <div class="admin-dropzone__btns">
+      <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" data-pick="camera">
+        📷 Caméra
+      </button>
+      <button type="button" class="admin-btn admin-btn--dark admin-btn--sm" data-pick="files">
+        🖼 Fichiers
+      </button>
     </div>
-    <button class="admin-btn admin-btn--dark admin-btn--sm" type="submit">Téléverser</button>
-  </form>
+    <small class="admin-dropzone__info">JPEG, PNG ou WebP · 2 Mo max · 8 photos · glisser une vignette pour changer l'ordre</small>
+    <div class="admin-dropzone__progress" hidden>
+      <div class="admin-dropzone__bar"></div>
+    </div>
+  </div>
+
+  <div id="img-grid" class="admin-imggrid" style="margin-top:.8rem">
+    <?php foreach ($images as $i => $img): $isPrimary = $i === 0; ?>
+      <div class="admin-imggrid__item <?= $isPrimary ? 'is-primary' : '' ?>" draggable="true" data-id="<?= (int) $img['id'] ?>">
+        <img src="<?= \App\Services\ImageService::thumbUrl((string) $img['file']) ?>" alt="" loading="lazy">
+        <?php if ($isPrimary): ?><span class="admin-imggrid__star" title="Image principale">★</span><?php endif; ?>
+        <div class="admin-imggrid__actions">
+          <?php if (!$isPrimary): ?>
+            <form method="post" action="<?= Url::admin('products/' . (int) $product['id'] . '/images/' . (int) $img['id'] . '/primary') ?>" style="margin:0">
+              <button type="submit" title="Mettre en principale">★</button>
+            </form>
+          <?php endif; ?>
+          <form method="post" action="<?= Url::admin('products/' . (int) $product['id'] . '/images/' . (int) $img['id'] . '/delete') ?>" style="margin:0"
+                data-confirm="Supprimer cette image ?">
+            <button type="submit" title="Supprimer" class="is-danger">✕</button>
+          </form>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
 </div>
 
 <!-- --------------------------------------------------------- Variantes -->

@@ -25,7 +25,7 @@ final class OrderApi
 
         $payload = Request::json();
         if ($payload === []) {
-            // Repli form-data (test curl sans JSON)
+            // Repli form-data (multipart ou test curl sans JSON)
             $payload = [
                 'name' => (string) Request::post('name', ''),
                 'phone' => (string) Request::post('phone', ''),
@@ -50,7 +50,7 @@ final class OrderApi
             ?? (isset($payload['idempotency_key']) ? (string) $payload['idempotency_key'] : null);
 
         try {
-            $result = OrderService::create($payload, $idempotencyKey);
+            $result = OrderService::create($payload, $idempotencyKey, self::collectFiles());
         } catch (\PDOException $e) {
             // L9 : une erreur de base de données n'est jamais une erreur de validation (422)
             error_log('[order] db ' . $e->getMessage());
@@ -69,8 +69,49 @@ final class OrderApi
             'total' => $result['total'],
             'whatsapp_url' => $result['whatsapp_url'],
             'duplicate' => !empty($result['duplicate']),
+            'images_count' => (int) ($result['images_count'] ?? 0),
         ], $result['duplicate'] ? 200 : 201, $result['duplicate']
             ? 'Commande déjà enregistrée.'
             : 'Commande enregistrée avec succès.');
+    }
+
+    /**
+     * Photos de référence (Sprint C) : `images[]` ou `image` en multipart.
+     *
+     * @return list<array{name:string,type:string,tmp_name:string,error:int,size:int}>
+     */
+    private static function collectFiles(): array
+    {
+        $out = [];
+        foreach (['images', 'image'] as $key) {
+            if (empty($_FILES[$key])) {
+                continue;
+            }
+            $f = $_FILES[$key];
+            if (is_array($f['name'] ?? null)) {
+                foreach ($f['name'] as $i => $name) {
+                    $err = (int) ($f['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_NO_FILE) {
+                        continue;
+                    }
+                    $out[] = [
+                        'name' => (string) $name,
+                        'type' => (string) ($f['type'][$i] ?? ''),
+                        'tmp_name' => (string) ($f['tmp_name'][$i] ?? ''),
+                        'error' => $err,
+                        'size' => (int) ($f['size'][$i] ?? 0),
+                    ];
+                }
+            } elseif ((int) ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $out[] = [
+                    'name' => (string) ($f['name'] ?? ''),
+                    'type' => (string) ($f['type'] ?? ''),
+                    'tmp_name' => (string) ($f['tmp_name'] ?? ''),
+                    'error' => (int) $f['error'],
+                    'size' => (int) ($f['size'] ?? 0),
+                ];
+            }
+        }
+        return $out;
     }
 }

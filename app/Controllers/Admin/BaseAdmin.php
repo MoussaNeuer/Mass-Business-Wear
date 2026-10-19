@@ -25,8 +25,21 @@ abstract class BaseAdmin
             'adminId' => Security::adminId(),
             'flash' => self::pullFlash(),
             'currentPath' => Request::path(),
+            'newOrdersCount' => self::newOrdersCount(),
         ];
         View::echo($view, $data, 'layouts/admin');
+    }
+
+    /** Commandes en attente (NEW) — badge sur la bottom-nav. */
+    private static function newOrdersCount(): int
+    {
+        try {
+            return (int) \App\Helpers\Database::value(
+                "SELECT COUNT(*) FROM orders WHERE status = 'NEW' AND archived_at IS NULL"
+            );
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 
     protected static function redirect(string $path, ?string $flash = null, string $type = 'ok'): never
@@ -56,21 +69,27 @@ abstract class BaseAdmin
         LogRepository::write(Security::adminId(), $action, $details, Request::ip());
     }
 
-    /** Redirige vers la liste avec message d'erreur (validation). */
-    protected static function backError(string $message): never
+    /** URL de retour sûre (Referer même hôte + chemin /admin), sinon l'admin. */
+    protected static function safeReturnUrl(?string $fallback = null): string
     {
-        self::flash($message, 'err');
-        // L9 : Referer accepté uniquement si même hôte + chemin /admin (anti open-redirect)
         $ref = Request::header('Referer');
-        $url = Url::admin();
+        $url = $fallback ?? Url::admin();
         if (is_string($ref) && $ref !== '') {
             $host = parse_url($ref, PHP_URL_HOST);
             $self = parse_url(Url::to('/'), PHP_URL_HOST);
             $path = (string) parse_url($ref, PHP_URL_PATH);
             if (is_string($host) && $host === $self && str_starts_with($path, '/admin')) {
-                $url = $ref;
+                return $ref;
             }
         }
-        Response::redirect($url);
+        return $url;
+    }
+
+    /** Redirige vers la liste avec message d'erreur (validation). */
+    protected static function backError(string $message): never
+    {
+        self::flash($message, 'err');
+        // L9 : Referer accepté uniquement si même hôte + chemin /admin (anti open-redirect)
+        Response::redirect(self::safeReturnUrl());
     }
 }

@@ -4,6 +4,9 @@
    états actifs. Zone tactile min. 48px.
    ============================================================ */
 
+/* Reset box-sizing (Bootstrap absent du layout guest) */
+*, *::before, *::after { box-sizing: border-box; }
+
 :root {
   /* Couleurs */
   --mbw-black: #0A0A0A;

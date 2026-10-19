@@ -1,9 +1,10 @@
 <?php
 /**
- * Détail d'une commande admin : articles, client, changement statut, historique.
+ * Détail d'une commande admin : articles, client, photos, changement statut, historique.
  * @var array $order
  * @var array $items
  * @var array $history
+ * @var array $clientImages
  * @var array $statusLabels
  * @var array $allowedStatuses
  * @var string $currency
@@ -49,6 +50,40 @@ $canConfirm = in_array('CONFIRMED', $allowedStatuses ?? [], true);
     <strong style="color:#fff;font-size:1.05rem"><?= number_format((int) $order['total'], 0, ',', ' ') ?> <?= Security::e($currency) ?></strong>
   </div>
 
+  <?php
+  // Stepper visuel (Sprint D) : progression NEW → CONFIRMED → PROCESSING → READY → DELIVERED
+  $flow = ['NEW', 'CONFIRMED', 'PROCESSING', 'READY', 'DELIVERED'];
+  $current = (string) $order['status'];
+  $currentIdx = array_search($current, $flow, true);
+  $cancelled = $current === 'CANCELLED';
+  ?>
+  <div class="admin-stepper" role="img" aria-label="Progression : <?= Security::e($statusLabels[$current] ?? $current) ?>">
+    <?php foreach ($flow as $i => $step): ?>
+      <?php
+      $cls = 'admin-stepper__step';
+      if ($cancelled && $i === 0) {
+          $cls .= ' is-done';
+      } elseif ($currentIdx !== false) {
+          if ($i < (int) $currentIdx) {
+              $cls .= ' is-done';
+          } elseif ($i === (int) $currentIdx) {
+              $cls .= ' is-current';
+          }
+      }
+      if ($cancelled && $i > 0) {
+          $cls .= '';
+      }
+      ?>
+      <div class="<?= $cls ?>">
+        <span class="admin-stepper__dot"><?= $i === (int) $currentIdx && $cancelled === false ? '●' : ($i < (int) $currentIdx || ($cancelled && $i === 0) ? '✓' : $i + 1) ?></span>
+        <span class="admin-stepper__label"><?= Security::e($statusLabels[$step] ?? $step) ?></span>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <?php if ($cancelled): ?>
+    <div style="text-align:center;font-size:.78rem;color:#f87171;font-weight:700;margin-bottom:.3rem">Commande annulée — stock restitué</div>
+  <?php endif; ?>
+
   <div style="font-size:.84rem;color:#9ca3af;line-height:1.6">
     <div><strong style="color:#d1d5db">Client :</strong> <?= Security::e((string) $order['customer_name']) ?></div>
     <div><strong style="color:#d1d5db">Téléphone :</strong> <?= Security::e((string) $order['customer_phone']) ?></div>
@@ -83,10 +118,33 @@ $canConfirm = in_array('CONFIRMED', $allowedStatuses ?? [], true);
 </div>
 <?php endif; ?>
 
+<?php if (!empty($clientImages)): ?>
+<div class="admin-card">
+  <div class="admin-card__head">
+    <h2 class="admin-card__title">Photos du client</h2>
+    <span style="font-size:.75rem;color:#6b7280"><?= count($clientImages) ?> photo(s) jointe(s)</span>
+  </div>
+  <p class="admin-card__sub" style="margin-bottom:.6rem">Référence visuelle envoyée avec la commande — touchez pour agrandir.</p>
+  <div class="admin-orderimgs">
+    <?php foreach ($clientImages as $img): ?>
+      <button type="button" class="admin-orderimgs__item"
+              data-lightbox="<?= Security::e(\App\Services\ImageService::orderUrl((string) $img['file'])) ?>"
+              aria-label="Agrandir la photo">
+        <img src="<?= Security::e(\App\Services\ImageService::orderUrl((string) $img['file'])) ?>" alt="Photo jointe" loading="lazy">
+        <span class="admin-orderimgs__zoom" aria-hidden="true">＋</span>
+      </button>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="admin-card">
   <div class="admin-card__head"><h2 class="admin-card__title">Articles</h2></div>
   <?php foreach ($items as $it): ?>
     <div class="admin-row" style="cursor:default">
+      <?php if (!empty($it['image_file'])): ?>
+        <img class="admin-row__thumb" src="<?= Security::e(\App\Services\ImageService::thumbUrl((string) $it['image_file'])) ?>" alt="" width="44" height="55" loading="lazy">
+      <?php endif; ?>
       <div class="admin-row__body">
         <div class="admin-row__title"><?= Security::e((string) $it['product_name']) ?></div>
         <div class="admin-row__meta">

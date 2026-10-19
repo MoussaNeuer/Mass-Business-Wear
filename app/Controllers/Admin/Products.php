@@ -11,7 +11,7 @@ use App\Helpers\Security;
 use App\Helpers\Url;
 use App\Repositories\AdminCategoryRepository;
 use App\Repositories\AdminProductRepository;
-use RuntimeException;
+use App\Services\ImageService;
 
 /**
  * CRUD produits admin + variantes + images.
@@ -93,10 +93,13 @@ final class Products extends BaseAdmin
     public function toggleFeatured(string $id): never
     {
         $id = (int) $id;
+        if (AdminProductRepository::find($id) === null) {
+            Response::abort(404, 'Produit introuvable.');
+        }
         AdminProductRepository::toggleFeatured($id);
         self::log('product.featured', '#' . $id);
-        $ref = Request::header('Referer');
-        Response::redirect(is_string($ref) ? $ref : Url::admin('products'));
+        // M1 : Referer validé (anti open-redirect)
+        Response::redirect(self::safeReturnUrl(Url::admin('products')));
     }
 
     public function setStatus(string $id): never
@@ -112,8 +115,8 @@ final class Products extends BaseAdmin
         }
         AdminProductRepository::setStatus($id, $status);
         self::log('product.status', $p['name'] . ' → ' . $status);
-        $ref = Request::header('Referer');
-        Response::redirect(is_string($ref) ? $ref : Url::admin('products'));
+        // M1 : Referer validé (anti open-redirect)
+        Response::redirect(self::safeReturnUrl(Url::admin('products')));
     }
 
     // ---------------------------------------------------------- Variantes
@@ -190,43 +193,172 @@ final class Products extends BaseAdmin
 
     // ------------------------------------------------------------- Images
 
+    /**
+     * Upload multi-fichiers (Sprint B) : drag & drop ou capture caméra.
+     * Réponse JSON si requête AJAX, sinon redirection classique.
+     */
     public function imageUpload(string $id): never
     {
         $id = (int) $id;
         if (AdminProductRepository::find($id) === null) {
-            Response::abort(404);
+            Response::abort(404, 'Produit introuvable.');
         }
-        if (empty($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
-            self::backError('Aucune image reçue ou erreur d\'upload.');
+        $files = self::collectFiles();
+        if ($files === []) {
+            $msg = 'Aucune image reçue. Formats acceptés : JPEG, PNG, WebP (max 2 Mo).';
+            if (Request::isAjax()) {
+                Response::error($msg, 400);
+            }
+            self::backError($msg);
         }
-        $file = $this->handleUpload($_FILES['image']);
-        AdminProductRepository::addImage($id, $file);
-        self::log('image.upload', $file . ' → produit #' . $id);
-        self::redirect(Url::admin('products/' . $id . '/edit'), 'Image ajoutée.');
+
+        $result = ImageService::saveProductImages($files, 8);
+        foreach ($result['saved'] as $name) {
+            AdminProductRepository::addImage($id, $name);
+            self::log('image.upload', $name . ' → produit #' . $id);
+        }
+        $count = count($result['saved']);
+        $message = $count > 1 ? $count . ' images ajoutées.' : ($count === 1 ? 'Image ajoutée.' : '');
+        if ($result['errors'] !== []) {
+            $message = ($message !== '' ? $message . ' ' : '') . implode(' ', $result['errors']);
+        }
+        if ($count === 0) {
+            if (Request::isAjax()) {
+                Response::error(implode(' ', $result['errors']) ?: 'Échec de l\'upload.', 400);
+            }
+            self::backError(implode(' ', $result['errors']) ?: 'Échec de l\'upload.');
+        }
+
+        if (Request::isAjax()) {
+            $rows = [];
+            foreach (AdminProductRepository::images($id) as $img) {
+                $rows[] = [
+                    'id' => (int) $img['id'],
+                    'file' => (string) $img['file'],
+                    'url' => ImageService::url((string) $img['file']),
+                    'thumb' => ImageService::thumbUrl((string) $img['file']),
+                    'primary' => (int) $img['sort_order'] < 0,
+                ];
+            }
+            Response::json(['images' => $rows], 200, $message ?: 'Image ajoutée.');
+        }
+        self::redirect(Url::admin('products/' . $id . '/edit'), $message ?: 'Image ajoutée.');
+    }
+
+    /** Réordonnancement drag & drop (JSON : {"ids":[3,1,2]}). */
+    public function imageSort(string $id): never
+    {
+        $id = (int) $id;
+        if (AdminProductRepository::find($id) === null) {
+            Response::abort(404, 'Produit introuvable.');
+        }
+        $ids = Request::json()['ids'] ?? null;
+        if (!is_array($ids) || $ids === []) {
+            Response::error('Ordre d\'images invalide.', 400);
+        }
+        $ids = array_values(array_map('intval', $ids));
+        // Unicité + appartenance au produit (anti IDOR) + complétude
+        if (count($ids) !== count(array_unique($ids))) {
+            Response::error('Ordre d\'images invalide (doublon).', 400);
+        }
+        $owned = array_map('intval', array_column(AdminProductRepository::images($id), 'id'));
+        if (count($ids) !== count($owned)) {
+            Response::error('L\'ordre doit contenir toutes les images du produit.', 400);
+        }
+        foreach ($ids as $imgId) {
+            if (!in_array($imgId, $owned, true)) {
+                Response::error('Image hors de ce produit.', 400);
+            }
+        }
+        AdminProductRepository::reorderImages($id, $ids);
+        self::log('image.sort', 'produit #' . $id . ' : ' . implode(',', $ids));
+        Response::json(null, 200, 'Ordre mis à jour.');
     }
 
     public function imageDestroy(string $id, string $imageId): never
     {
-        $images = AdminProductRepository::images((int) $id);
-        foreach ($images as $img) {
-            if ((int) $img['id'] === (int) $imageId) {
-                $path = dirname(__DIR__, 3) . '/public/uploads/products/' . $img['file'];
-                if (is_file($path)) {
-                    @unlink($path);
-                }
-                AdminProductRepository::deleteImage((int) $imageId);
-                self::log('image.delete', $img['file']);
-                break;
+        $id = (int) $id;
+        $imageId = (int) $imageId;
+        // M9 : l'image doit appartenir au produit de l'URL (anti IDOR)
+        if (!ImageService::purge($id, $imageId)) {
+            $msg = 'Image introuvable pour ce produit.';
+            if (Request::isAjax()) {
+                Response::error($msg, 404);
             }
+            self::backError($msg);
         }
-        self::redirect(Url::admin('products/' . (int) $id . '/edit'), 'Image supprimée.');
+        self::log('image.delete', 'image #' . $imageId . ' (produit #' . $id . ')');
+        if (Request::isAjax()) {
+            Response::json(null, 200, 'Image supprimée.');
+        }
+        self::redirect(Url::admin('products/' . $id . '/edit'), 'Image supprimée.');
     }
 
     public function imagePrimary(string $id, string $imageId): never
     {
-        AdminProductRepository::setPrimaryImage((int) $id, (int) $imageId);
+        $id = (int) $id;
+        $imageId = (int) $imageId;
+        // M9 : l'image doit appartenir au produit de l'URL (anti IDOR)
+        $found = false;
+        foreach (AdminProductRepository::images($id) as $img) {
+            if ((int) $img['id'] === $imageId) {
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            $msg = 'Image introuvable pour ce produit.';
+            if (Request::isAjax()) {
+                Response::error($msg, 404);
+            }
+            self::backError($msg);
+        }
+        AdminProductRepository::setPrimaryImage($id, $imageId);
         self::log('image.primary', 'image #' . $imageId);
-        self::redirect(Url::admin('products/' . (int) $id . '/edit'), 'Image principale définie.');
+        if (Request::isAjax()) {
+            Response::json(null, 200, 'Image principale définie.');
+        }
+        self::redirect(Url::admin('products/' . $id . '/edit'), 'Image principale définie.');
+    }
+
+    /**
+     * Normalise $_FILES : champ `images[]` (multi) ou `image` (unique).
+     *
+     * @return list<array{name:string,type:string,tmp_name:string,error:int,size:int}>
+     */
+    private static function collectFiles(): array
+    {
+        $out = [];
+        foreach (['images', 'image'] as $key) {
+            if (empty($_FILES[$key])) {
+                continue;
+            }
+            $f = $_FILES[$key];
+            if (is_array($f['name'] ?? null)) {
+                foreach ($f['name'] as $i => $name) {
+                    $err = (int) ($f['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+                    if ($err === UPLOAD_ERR_NO_FILE) {
+                        continue;
+                    }
+                    $out[] = [
+                        'name' => (string) $name,
+                        'type' => (string) ($f['type'][$i] ?? ''),
+                        'tmp_name' => (string) ($f['tmp_name'][$i] ?? ''),
+                        'error' => $err,
+                        'size' => (int) ($f['size'][$i] ?? 0),
+                    ];
+                }
+            } elseif ((int) ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $out[] = [
+                    'name' => (string) ($f['name'] ?? ''),
+                    'type' => (string) ($f['type'] ?? ''),
+                    'tmp_name' => (string) ($f['tmp_name'] ?? ''),
+                    'error' => (int) $f['error'],
+                    'size' => (int) ($f['size'] ?? 0),
+                ];
+            }
+        }
+        return $out;
     }
 
     // ------------------------------------------------------------ Helpers
@@ -273,42 +405,5 @@ final class Products extends BaseAdmin
             'seo_title' => trim(Request::post('seo_title', '')),
             'seo_description' => trim(Request::post('seo_description', '')),
         ];
-    }
-
-    /** Upload image produit : MIME réel, 2 Mo max, JPEG/PNG/WebP, nom aléatoire. */
-    private function handleUpload(array $file): string
-    {
-        if ((int) $file['size'] > 2 * 1024 * 1024) {
-            self::backError('Image trop lourde (max 2 Mo).');
-        }
-        $info = @getimagesize($file['tmp_name']);
-        if ($info === false) {
-            self::backError('Fichier image invalide.');
-        }
-        $mime = $info['mime'] ?? '';
-        $ext = match ($mime) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/webp' => 'webp',
-            default => null,
-        };
-        if ($ext === null) {
-            self::backError('Format non autorisé (JPEG, PNG ou WebP).');
-        }
-
-        $name = bin2hex(random_bytes(12)) . '.' . $ext;
-        $dest = dirname(__DIR__, 3) . '/public/uploads/products/' . $name;
-        $dir = dirname($dest);
-        if (!is_dir($dir) && !@mkdir($dir, 0775, true)) {
-            self::backError('Dossier d\'upload inaccessible.');
-        }
-        if (!@move_uploaded_file($file['tmp_name'], $dest)) {
-            // repli pour tests CLI
-            if (!@rename($file['tmp_name'], $dest) && !@copy($file['tmp_name'], $dest)) {
-                self::backError('Échec de l\'enregistrement de l\'image.');
-            }
-        }
-        @chmod($dest, 0644);
-        return $name;
     }
 }

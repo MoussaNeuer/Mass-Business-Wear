@@ -1,5 +1,5 @@
 /* MASS BUSINESS WEAR — Hero cinématique
-   Swipe tactile, auto-play discret, cascade texte, prefers-reduced-motion */
+   Cascade entre slides, swipe tactile, auto-play, reduced-motion */
 (function () {
   'use strict';
 
@@ -13,7 +13,6 @@
   var indexEl = root.querySelector('[data-hero-index]');
   if (!slides.length) return;
 
-  // Textes par slide (data-title / data-tag sur <figure>)
   var titles = [];
   var tags = [];
   slides.forEach(function (s, i) {
@@ -25,12 +24,7 @@
   var locked = false;
   var autoTimer = null;
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var AUTO_MS = 5500;
-
-  // ---------------------------------------------------------- helpers
-  function pad(n) {
-    return n < 10 ? '0' + n : String(n);
-  }
+  var AUTO_MS = 6000;
 
   function setCopy(i) {
     if (titleEl) titleEl.textContent = titles[i] || ('Look ' + (i + 1));
@@ -38,26 +32,31 @@
     if (indexEl) indexEl.textContent = String(i + 1);
   }
 
-  function go(next, dir) {
+  function go(next) {
     if (locked || next === current || next < 0 || next >= slides.length) return;
     locked = true;
 
     var prev = current;
     current = next;
 
-    slides[prev].classList.remove('is-active');
+    // Sortie cascade de l'ancien
+    slides[prev].classList.remove('is-active', 'is-entering');
     slides[prev].classList.add('is-leaving');
     slides[prev].setAttribute('aria-hidden', 'true');
 
-    slides[current].classList.add('is-active');
-    slides[current].classList.remove('is-leaving');
-    slides[current].removeAttribute('aria-hidden');
+    // Entrée cascade du nouveau
+    var el = slides[current];
+    el.classList.remove('is-leaving', 'is-entering');
+    // force reflow pour relancer l'animation
+    void el.offsetWidth;
+    el.classList.add('is-entering', 'is-active');
+    el.removeAttribute('aria-hidden');
 
-    // Nettoyer l'état leaving après la transition
     window.setTimeout(function () {
+      el.classList.remove('is-entering');
       slides[prev].classList.remove('is-leaving');
       locked = false;
-    }, reduced ? 220 : 880);
+    }, reduced ? 280 : 960);
 
     dots.forEach(function (d, i) {
       var on = i === current;
@@ -67,18 +66,17 @@
 
     setCopy(current);
 
-    // Re-cascade typographique
     if (!reduced) {
       root.classList.remove('is-recascade');
-      // force reflow
       void root.offsetWidth;
       root.classList.add('is-recascade');
       window.setTimeout(function () {
         root.classList.remove('is-recascade');
-      }, 900);
+      }, 1000);
     }
 
-    preload(current + (dir === 'prev' ? -1 : 1));
+    preload(current + 1);
+    preload(current - 1);
   }
 
   function preload(i) {
@@ -94,7 +92,7 @@
   var startX = 0;
   var startY = 0;
   var tracking = false;
-  var axis = null; // 'x' | 'y'
+  var axis = null;
 
   function onPointerDown(e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -121,15 +119,15 @@
   function onPointerUp(e) {
     if (!tracking) return;
     tracking = false;
-    if (axis !== 'x') return;
+    if (axis !== 'x') { startAuto(); return; }
 
     var dx = e.clientX - startX;
-    var threshold = Math.min(72, root.clientWidth * 0.18);
+    var threshold = Math.min(72, root.clientWidth * 0.16);
 
     if (dx <= -threshold) {
-      go(current + 1 < slides.length ? current + 1 : 0, 'next');
+      go(current + 1 < slides.length ? current + 1 : 0);
     } else if (dx >= threshold) {
-      go(current - 1 >= 0 ? current - 1 : slides.length - 1, 'prev');
+      go(current - 1 >= 0 ? current - 1 : slides.length - 1);
     }
     startAuto();
   }
@@ -144,8 +142,6 @@
   root.addEventListener('pointermove', onPointerMove, { passive: true });
   root.addEventListener('pointerup', onPointerUp, { passive: true });
   root.addEventListener('pointercancel', onPointerCancel, { passive: true });
-
-  // Empêcher le drag d'image natif
   root.addEventListener('dragstart', function (e) { e.preventDefault(); });
 
   // ---------------------------------------------------------- dots
@@ -153,7 +149,7 @@
     d.addEventListener('click', function () {
       var i = parseInt(d.getAttribute('data-dot'), 10);
       if (!isNaN(i)) {
-        go(i, i > current ? 'next' : 'prev');
+        go(i);
         stopAuto();
         startAuto();
       }
@@ -164,23 +160,23 @@
   root.addEventListener('keydown', function (e) {
     if (e.key === 'ArrowRight') {
       e.preventDefault();
-      go(current + 1 < slides.length ? current + 1 : 0, 'next');
+      go(current + 1 < slides.length ? current + 1 : 0);
       stopAuto();
       startAuto();
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      go(current - 1 >= 0 ? current - 1 : slides.length - 1, 'prev');
+      go(current - 1 >= 0 ? current - 1 : slides.length - 1);
       stopAuto();
       startAuto();
     }
   });
 
-  // ---------------------------------------------------------- auto-play discret
+  // ---------------------------------------------------------- auto-play
   function startAuto() {
     if (reduced || slides.length < 2) return;
     stopAuto();
     autoTimer = window.setInterval(function () {
-      go(current + 1 < slides.length ? current + 1 : 0, 'next');
+      go(current + 1 < slides.length ? current + 1 : 0);
     }, AUTO_MS);
   }
 
@@ -191,7 +187,6 @@
     }
   }
 
-  // Pause hors écran
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
@@ -203,17 +198,14 @@
   }
 
   // ---------------------------------------------------------- boot
-  // Marquer prêt pour déclencher la cascade CSS
   requestAnimationFrame(function () {
     requestAnimationFrame(function () {
       root.classList.add('is-ready');
     });
   });
 
-  // Précharger le 2e visuel seulement (perf mobile)
   preload(1);
 
-  // Pause auto sur interaction tactile longue
   root.addEventListener('touchstart', stopAuto, { passive: true });
   root.addEventListener('touchend', function () { startAuto(); }, { passive: true });
 })();

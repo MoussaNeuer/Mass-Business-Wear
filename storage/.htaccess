@@ -1,0 +1,2 @@
+# storage/ n'est jamais exposé — filet de sécurité si le docroot bouge
+Require all denied

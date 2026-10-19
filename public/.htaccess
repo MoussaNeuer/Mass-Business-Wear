@@ -1,0 +1,36 @@
+# MASS BUSINESS WEAR — front controller
+Options -Indexes -MultiViews
+RewriteEngine On
+DirectoryIndex index.php
+
+# --- Statiques d'assets : cache long (hash non versionné → 1 jour), sauf SW ---
+<FilesMatch "\.(png|jpg|jpeg|webp|svg|css|js|woff2?)$">
+  Header set Cache-Control "public, max-age=86400"
+</FilesMatch>
+
+# --- Service workers : jamais de cache (sinon déploiement bloqué) ---
+# Doit venir APRÈS la règle assets pour écraser max-age=86400
+<FilesMatch "^(service-worker|admin-sw)\.js$">
+  Header set Cache-Control "no-cache, no-store, must-revalidate"
+  Header unset Service-Worker-Allowed
+  Header set Service-Worker-Allowed "/"
+</FilesMatch>
+
+# --- Manifests : type correct + cache court ---
+<FilesMatch "\.json$">
+  Header set Content-Type "application/manifest+json"
+  Header set Cache-Control "public, max-age=3600"
+</FilesMatch>
+
+# --- En-têtes sur fichiers statiques (PHP ne les voit pas) ---
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^ index.php [L]

@@ -1,0 +1,381 @@
+/* MASS BUSINESS WEAR — Hero cinématique (Phase 8)
+   Cinematic reveal · cascade typographique · swipe tactile · reduced-motion */
+
+.hero-cine {
+  position: relative;
+  width: 100%;
+  /* Hauteur quasi plein écran sous le header sticky (~56px) */
+  height: calc(100svh - 56px);
+  min-height: 520px;
+  max-height: 920px;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  /* Pas de débordement horizontal */
+  contain: layout paint;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+
+.hero-cine__stage {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------------------------------------------------------- Slides */
+
+.hero-cine__slide {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity .85s cubic-bezier(.4, 0, .2, 1),
+    visibility 0s linear .85s;
+  will-change: opacity;
+}
+
+.hero-cine__slide.is-active {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity .85s cubic-bezier(.4, 0, .2, 1),
+    visibility 0s linear 0s;
+  z-index: 1;
+}
+
+/* Sortie légèrement plus rapide que l'entrée (fondu croisé net) */
+.hero-cine__slide.is-leaving {
+  opacity: 0;
+  visibility: visible;
+  z-index: 0;
+}
+
+.hero-cine__slide picture,
+.hero-cine__slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  pointer-events: none;
+}
+
+/* Cinematic Reveal : zoom subtil sur le slide actif */
+.hero-cine__slide.is-active img {
+  animation: cineReveal 1.35s cubic-bezier(.22, .61, .36, 1) both;
+}
+
+.hero-cine__slide.is-active .hero-cine__veil {
+  animation: cineVeil 1.5s cubic-bezier(.33, 1, .68, 1) both;
+}
+
+@keyframes cineReveal {
+  from {
+    transform: scale(1.12);
+    filter: brightness(.55) contrast(1.08);
+  }
+  to {
+    transform: scale(1);
+    filter: brightness(1) contrast(1);
+  }
+}
+
+/* Voile sombre : révèle progressivement l'outfit */
+@keyframes cineVeil {
+  0% {
+    opacity: 1;
+  }
+  40% {
+    opacity: .55;
+  }
+  100% {
+    opacity: .42;
+  }
+}
+
+.hero-cine__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* Voile + dégradé bas pour la lisibilité du texte */
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, .55) 0%, rgba(0, 0, 0, .15) 32%, rgba(0, 0, 0, .2) 48%, rgba(0, 0, 0, .82) 100%),
+    radial-gradient(ellipse 120% 80% at 50% 30%, transparent 40%, rgba(0, 0, 0, .45) 100%);
+  opacity: .42;
+}
+
+/* Grain filmique ultra-léger (pas d'image, pur CSS) */
+.hero-cine__grain {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: .07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+/* ---------------------------------------------------------- Copy / cascade */
+
+.hero-cine__copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  padding: 1.25rem 1.15rem calc(4.2rem + env(safe-area-inset-bottom, 0px));
+  max-width: 36rem;
+  margin: 0 auto;
+  text-align: left;
+  /* Empêche le texte de déborder */
+  word-break: break-word;
+}
+
+.hero-cine__kicker {
+  margin: 0 0 .45rem;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .72);
+}
+
+.hero-cine__kicker span {
+  color: #ff3b3b;
+}
+
+.hero-cine__title {
+  margin: 0 0 .5rem;
+  font-size: clamp(1.75rem, 7.5vw, 2.85rem);
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, .55);
+}
+
+.hero-cine__tag {
+  margin: 0 0 1.1rem;
+  font-size: .9rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, .82);
+  max-width: 28rem;
+}
+
+.hero-cine__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+}
+
+.hero-cine__btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* Cascade typographique — délais successifs */
+.hero-cine.is-ready .hero-cine__kicker {
+  animation: cascadeIn .7s cubic-bezier(.22, .61, .36, 1) .25s both;
+}
+
+.hero-cine.is-ready .hero-cine__title {
+  animation: cascadeIn .75s cubic-bezier(.22, .61, .36, 1) .42s both;
+}
+
+.hero-cine.is-ready .hero-cine__tag {
+  animation: cascadeIn .75s cubic-bezier(.22, .61, .36, 1) .58s both;
+}
+
+.hero-cine.is-ready .hero-cine__actions {
+  animation: cascadeIn .7s cubic-bezier(.22, .61, .36, 1) .74s both;
+}
+
+@keyframes cascadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Re-cascade quand le texte change (slide) */
+.hero-cine.is-recascade .hero-cine__kicker,
+.hero-cine.is-recascade .hero-cine__title,
+.hero-cine.is-recascade .hero-cine__tag,
+.hero-cine.is-recascade .hero-cine__actions {
+  animation: cascadeIn .55s cubic-bezier(.22, .61, .36, 1) both;
+}
+
+.hero-cine.is-recascade .hero-cine__title { animation-delay: .08s; }
+.hero-cine.is-recascade .hero-cine__tag { animation-delay: .16s; }
+.hero-cine.is-recascade .hero-cine__actions { animation-delay: .24s; }
+
+/* ---------------------------------------------------------- UI / progress */
+
+.hero-cine__ui {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(1.35rem + env(safe-area-inset-bottom, 0px));
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1.15rem;
+  max-width: 36rem;
+  margin: 0 auto;
+}
+
+.hero-cine__progress {
+  display: flex;
+  gap: .4rem;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-cine__dot {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  height: 3px;
+  flex: 1;
+  max-width: 48px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .28);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: background .3s ease;
+}
+
+.hero-cine__dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #fff;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .35s cubic-bezier(.22, .61, .36, 1);
+}
+
+.hero-cine__dot.is-active {
+  background: rgba(255, 255, 255, .35);
+}
+
+.hero-cine__dot.is-active::after {
+  transform: scaleX(1);
+}
+
+.hero-cine__dot:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.hero-cine__counter {
+  flex: none;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: rgba(255, 255, 255, .75);
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-cine__counter i {
+  font-style: normal;
+  opacity: .4;
+  margin: 0 .15rem;
+}
+
+/* ---------------------------------------------------------- Desktop */
+
+@media (min-width: 768px) {
+  .hero-cine {
+    height: calc(100svh - 60px);
+    min-height: 560px;
+    border-radius: 0;
+  }
+
+  .hero-cine__copy,
+  .hero-cine__ui {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+    max-width: 42rem;
+  }
+
+  .hero-cine__copy {
+    margin-left: 0;
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hero-cine__ui {
+    margin-left: 0;
+    max-width: 42rem;
+  }
+
+  .hero-cine__title {
+    font-size: clamp(2.4rem, 4.5vw, 3.6rem);
+  }
+
+  .hero-cine__btn {
+    flex: 0 0 auto;
+    min-width: 11rem;
+  }
+
+  .hero-cine__dot {
+    max-width: 56px;
+  }
+}
+
+/* ---------------------------------------------------------- Reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-cine__slide,
+  .hero-cine__slide.is-active,
+  .hero-cine__slide.is-leaving {
+    transition: opacity .2s linear;
+    animation: none !important;
+  }
+
+  .hero-cine__slide.is-active img,
+  .hero-cine__slide.is-active .hero-cine__veil {
+    animation: none !important;
+    transform: none !important;
+    filter: none !important;
+    opacity: .42;
+  }
+
+  .hero-cine.is-ready .hero-cine__kicker,
+  .hero-cine.is-ready .hero-cine__title,
+  .hero-cine.is-ready .hero-cine__tag,
+  .hero-cine.is-ready .hero-cine__actions,
+  .hero-cine.is-recascade .hero-cine__kicker,
+  .hero-cine.is-recascade .hero-cine__title,
+  .hero-cine.is-recascade .hero-cine__tag,
+  .hero-cine.is-recascade .hero-cine__actions {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  .hero-cine__dot::after {
+    transition: none;
+  }
+}

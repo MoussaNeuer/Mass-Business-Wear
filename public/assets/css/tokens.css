@@ -1,0 +1,79 @@
+/* ============================================================
+   MASS BUSINESS WEAR — Design tokens
+   Noir/blanc dominent. Rouge réservé aux CTA, promos, badges,
+   états actifs. Zone tactile min. 48px.
+   ============================================================ */
+
+:root {
+  /* Couleurs */
+  --mbw-black: #0A0A0A;
+  --mbw-ink: #141414;
+  --mbw-grey-900: #1E1E1E;
+  --mbw-grey-800: #2A2A2A;
+  --mbw-grey-600: #6B6B6B;
+  --mbw-grey-400: #9A9A9A;
+  --mbw-grey-300: #CFCFCF;
+  --mbw-grey-100: #F2F2F2;
+  --mbw-white: #FFFFFF;
+  --mbw-red: #D40000;
+  --mbw-red-dark: #A80000;
+  --mbw-red-soft: rgba(212, 0, 0, .12);
+  --mbw-green: #16A34A;
+  --mbw-amber: #D97706;
+
+  /* Sémantique (thème sombre par défaut côté boutique) */
+  --bg: var(--mbw-black);
+  --surface: var(--mbw-ink);
+  --surface-2: var(--mbw-grey-900);
+  --border: rgba(255, 255, 255, .08);
+  --text: var(--mbw-white);
+  --text-muted: var(--mbw-grey-400);
+
+  /* Typographie */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fs-xs: .75rem;
+  --fs-sm: .875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.25rem;
+  --fs-xl: 1.75rem;
+  --fs-2xl: clamp(1.9rem, 7vw, 3rem);
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
+  --fw-black: 800;
+
+  /* Espacements et formes */
+  --sp-1: .25rem;
+  --sp-2: .5rem;
+  --sp-3: 1rem;
+  --sp-4: 1.5rem;
+  --sp-5: 2.5rem;
+  --sp-6: 4rem;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --radius-lg: 22px;
+  --tap: 48px;
+  --shadow: 0 6px 20px rgba(0, 0, 0, .18);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, .35);
+
+  /* Layout */
+  --header-h: 60px;
+  --bottomnav-h: 62px;
+  --container: 1120px;
+
+  /* Motion */
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --dur: .18s;
+}
+
+/* Thème clair forcé (admin) */
+.theme-light {
+  --bg: var(--mbw-white);
+  --surface: var(--mbw-white);
+  --surface-2: var(--mbw-grey-100);
+  --border: rgba(0, 0, 0, .1);
+  --text: var(--mbw-ink);
+  --text-muted: var(--mbw-grey-600);
+  background: var(--bg);
+  color: var(--text);
+}

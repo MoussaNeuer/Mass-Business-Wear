@@ -1,0 +1,27 @@
+# ============================================================
+#  MASS BUSINESS WEAR — racine du projet
+#  Docroot WAMP = C:\wamp64\www, donc ce .htaccess protège
+#  tout ce qui n'est pas dans /public et pointe le / vers public/.
+# ============================================================
+Options -Indexes -MultiViews
+RewriteEngine On
+DirectoryIndex public/index.php
+
+# --- Fichiers sensibles : jamais exposés -------------------
+# Points d'entrée / fichiers cachés (.env, .git, .ht*, .user.ini...)
+RewriteRule (^|/)\. - [F,L]
+
+# Dossiers applicatifs hors /public
+RewriteRule ^(app|config|database|routes|storage|background)(/|$) - [F,L]
+
+# Fichiers racine non publics (README, logo source, docx, scripts CLI)
+RewriteRule ^(README|Cahier_des_charges).* - [F,L]
+RewriteRule ^logo\.jpeg$ - [F,L]
+RewriteRule ^database(/|$) - [F,L]
+
+# --- Tout le reste -> front controller ---------------------
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^ public/index.php [L]

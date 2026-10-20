@@ -23,6 +23,7 @@ final class OrderSuccessController
         $order = null;
         $customer = null;
         $items = [];
+        $photos = [];
 
         if ($ref !== '' && preg_match('/^MBW-[A-Z0-9]{6,12}-\d{3}$/', $ref) === 1) {
             $order = Database::one(
@@ -35,10 +36,25 @@ final class OrderSuccessController
                 [$ref]
             );
             if ($order !== null) {
+                $orderId = (int) $order['id'];
+
+                // Articles + miniature du produit pour un récap lisible
                 $items = Database::all(
-                    'SELECT product_name, size, color, unit_price, quantity
-                     FROM order_items WHERE order_id = ? ORDER BY id ASC',
-                    [(int) $order['id']]
+                    'SELECT oi.product_id, oi.variant_id, oi.product_name, oi.size, oi.color,
+                            oi.unit_price, oi.quantity,
+                            (SELECT i.file FROM product_images i
+                              WHERE i.product_id = oi.product_id
+                              ORDER BY i.sort_order, i.id LIMIT 1) AS image
+                     FROM order_items oi
+                     WHERE oi.order_id = ?
+                     ORDER BY oi.id ASC',
+                    [$orderId]
+                );
+
+                // Photos de référence jointes par le client (Sprint C)
+                $photos = Database::all(
+                    'SELECT id, file FROM order_images WHERE order_id = ? ORDER BY id ASC',
+                    [$orderId]
                 );
             }
         }
@@ -49,18 +65,14 @@ final class OrderSuccessController
                 'title' => 'Commande — MASS BUSINESS WEAR',
                 'order' => null,
                 'items' => [],
+                'photos' => [],
                 'currency' => SettingRepository::currency(),
                 'whatsapp' => SettingRepository::whatsapp(),
             ], 'layouts/shop');
         }
 
         $currency = SettingRepository::currency();
-
-        // Nombre de photos de référence jointes (Sprint C)
-        $photosCount = (int) (Database::value(
-            'SELECT COUNT(*) FROM order_images WHERE order_id = ?',
-            [(int) $order['id']]
-        ) ?? 0);
+        $photosCount = count($photos);
 
         // Libellé de zone lisible (la colonne peut contenir un ancien id)
         $zone = (string) $order['zone'];
@@ -97,6 +109,7 @@ final class OrderSuccessController
             'title' => 'Commande ' . $order['reference'] . ' — MASS BUSINESS WEAR',
             'order' => $order,
             'items' => $items,
+            'photos' => $photos,
             'currency' => $currency,
             'whatsapp' => $waUrl,
         ], 'layouts/shop');

@@ -49,6 +49,11 @@ JS;
 <link rel="stylesheet" href="<?= Url::asset('css/tokens.css') ?>">
 <link rel="stylesheet" href="<?= Url::asset('css/app.css') ?>">
 <link rel="stylesheet" href="<?= Url::asset('css/hero-cine.css') ?>">
+<script src="<?= Url::asset('vendor/bootstrap/js/bootstrap.bundle.min.js') ?>" defer></script>
+<script src="<?= Url::asset('js/ui.js') ?>" defer></script>
+<script src="<?= Url::asset('js/cart.js') ?>" defer></script>
+<script src="<?= Url::asset('js/products.js') ?>" defer></script>
+<script src="<?= Url::asset('js/hero-cine.js') ?>" defer></script>
 </head>
 <body>
 <a class="sr-only" href="#main">Aller au contenu</a>
@@ -71,6 +76,12 @@ JS;
         <div class="search-results" hidden></div>
       </form>
     </div>
+
+    <nav class="shop-header__nav" aria-label="Navigation boutique">
+      <a href="<?= Url::to('/') ?>" <?= $isHome ? 'class="is-active" aria-current="page"' : '' ?>>Accueil</a>
+      <a href="<?= Url::to('shop') ?>" <?= $isShop ? 'class="is-active" aria-current="page"' : '' ?>>Boutique</a>
+      <a href="<?= Url::to('contact') ?>">Aide</a>
+    </nav>
 
     <div class="shop-header__icons">
       <a class="icon-btn" href="<?= Url::to('cart') ?>" aria-label="Panier">
@@ -141,11 +152,6 @@ JS;
   </a>
 </nav>
 
-<script src="<?= Url::asset('vendor/bootstrap/js/bootstrap.bundle.min.js') ?>" defer></script>
-<script src="<?= Url::asset('js/ui.js') ?>" defer></script>
-<script src="<?= Url::asset('js/cart.js') ?>" defer></script>
-<script src="<?= Url::asset('js/products.js') ?>" defer></script>
-<script src="<?= Url::asset('js/hero-cine.js') ?>" defer></script>
 <script><?= $cartCountScript ?></script>
 <script>
 if ('serviceWorker' in navigator) {

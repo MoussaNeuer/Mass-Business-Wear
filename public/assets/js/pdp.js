@@ -71,6 +71,18 @@
     }).map(function (v) { return v[valueKey]; });
   }
 
+  /** Auto-sélectionne une option quand il n'en existe qu'une seule. */
+  function preselectSingles() {
+    if (data.hasSize && !state.size) {
+      var s = optionValues('size');
+      if (s.length === 1) state.size = s[0];
+    }
+    if (data.hasColor && !state.color) {
+      var c = optionValues('color');
+      if (c.length === 1) state.color = c[0];
+    }
+  }
+
   function findVariant() {
     if (!variants.length) {
       // Produit sans variantes : vendable tel quel, stock = stock produit
@@ -106,7 +118,7 @@
   function refresh() {
     renderPills();
     var v = findVariant();
-    var priceEl = document.querySelector('[data-pdp-price]');
+    var priceEls = document.querySelectorAll('[data-pdp-price]');
     var stockEl = document.querySelector('[data-pdp-stock]');
     var cta = document.querySelector('[data-add-to-cart]');
     var qtyMaxInput = document.querySelector('[data-qty]');
@@ -115,31 +127,50 @@
     var price = ready && v.price_override != null ? v.price_override : data.price;
     var stock = ready ? v.stock : 0;
 
-    if (priceEl) {
-      priceEl.innerHTML = formatMoney(price) +
+    priceEls.forEach(function (el) {
+      el.innerHTML = formatMoney(price) +
         (data.oldPrice ? ' <s class="price--old">' + formatMoney(data.oldPrice) + '</s>' : '');
+    });
+
+    // CTA sticky : total à payer (prix × quantité)
+    var totalEl = document.querySelector('[data-pdp-total]');
+    if (totalEl) {
+      totalEl.innerHTML = state.qty > 1
+        ? '<small style="font-weight:400;font-size:.72rem;color:#9ca3af;display:block;line-height:1">Total ' + state.qty + '×</small>' + formatMoney(price * state.qty)
+        : formatMoney(price);
     }
 
     if (stockEl) {
-      if (!ready && data.hasSize && data.hasColor && state.size && state.color) {
-        stockEl.textContent = 'Combinaison épuisée';
-        stockEl.className = 'text-muted';
-      } else if (ready && stock <= 3) {
+      if (ready && stock <= 3) {
         stockEl.textContent = 'Plus que ' + stock + ' en stock';
         stockEl.className = 'text-red';
       } else if (ready) {
         stockEl.textContent = 'En stock';
         stockEl.className = 'text-muted';
+      } else if (variants.length && data.hasSize && !state.size) {
+        stockEl.textContent = 'Choisissez une taille pour voir le stock';
+        stockEl.className = 'text-muted';
+      } else if (variants.length && data.hasColor && !state.color) {
+        stockEl.textContent = 'Choisissez une couleur pour voir le stock';
+        stockEl.className = 'text-muted';
       } else {
-        stockEl.textContent = '';
+        stockEl.textContent = 'Combinaison épuisée';
+        stockEl.className = 'text-muted';
       }
     }
 
     if (qtyMaxInput) {
-      qtyMaxInput.max = String(Math.min(stock || 1, 20));
-      if (state.qty > (stock || 1)) {
-        state.qty = Math.min(stock, 20) || 1;
+      // Tant que la sélection est incomplète, on autorise jusqu'à 20
+      // (re-clamé sur le stock réel dès que la variante est résolue).
+      var cap = ready ? Math.max(1, stock) : 20;
+      qtyMaxInput.max = String(Math.min(cap, 20));
+      if (ready && state.qty > stock) {
+        state.qty = Math.max(1, Math.min(stock, 20));
         qtyMaxInput.value = String(state.qty);
+      }
+      if (!ready && state.qty > 20) {
+        state.qty = 20;
+        qtyMaxInput.value = '20';
       }
     }
 
@@ -160,13 +191,19 @@
       }
     }
 
-    // Lien WhatsApp pré-rempli avec la sélection courante
+    // Lien WhatsApp pré-rempli en permanence avec la sélection courante
     var wa = document.querySelector('[data-wa-order]');
     if (wa && data.whatsapp) {
-      var text = data.name + (ready
-        ? ' — Taille: ' + (state.size || '-') + ', Couleur: ' + (state.color || '-') + ', Qté: ' + state.qty
-        : '');
-      wa.href = 'https://wa.me/221' + data.whatsapp + '?text=' + encodeURIComponent(text + ' | ' + data.shareUrl);
+      var lines = ['Bonjour, je souhaite commander ce produit :', '• ' + data.name];
+      if (state.size) lines.push('• Taille : ' + state.size);
+      if (state.color) lines.push('• Couleur : ' + state.color);
+      lines.push('• Quantité : ' + state.qty);
+      lines.push('• Prix unitaire : ' + formatMoney(price));
+      if (ready) lines.push('• Sous-total : ' + formatMoney(price * state.qty));
+      lines.push('');
+      lines.push(data.shareUrl);
+      wa.href = 'https://wa.me/221' + data.whatsapp + '?text=' + encodeURIComponent(lines.join('\n'));
+      wa.setAttribute('data-wa-ready', ready ? '1' : '0');
     }
   }
 
@@ -198,6 +235,7 @@
       var next = state.qty + (btn.getAttribute('data-qty-act') === 'inc' ? 1 : -1);
       state.qty = Math.max(1, Math.min(max, next));
       input.value = String(state.qty);
+      refresh();
     });
     var qtyInput = qtyWrap.querySelector('[data-qty]');
     if (qtyInput) {
@@ -237,18 +275,46 @@
 
   /* ---------------- Partage ---------------- */
 
+  /** Copie robuste : clipboard API + repli textarea/execCommand + toast d'erreur. */
+  function copyText(text, okMsg) {
+    function fallback() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, text.length);
+        var ok = document.execCommand('copy');
+        ta.remove();
+        if (ok) { ui.toast(okMsg, 'ok'); return; }
+      } catch (e) { /* on tente le toast ci-dessous */ }
+      ui.toast('Copiez le lien depuis la barre d\'adresse', 'err');
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () {
+        ui.toast(okMsg, 'ok');
+      }).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
   var shareBtn = document.querySelector('[data-share]');
   if (shareBtn) {
     shareBtn.addEventListener('click', function () {
       var payload = { title: data.name, text: data.name + ' — MASS BUSINESS WEAR', url: data.shareUrl };
       if (navigator.share) {
-        navigator.share(payload).catch(function () { /* annulé */ });
-      } else if (navigator.clipboard) {
-        navigator.clipboard.writeText(data.shareUrl).then(function () {
-          ui.toast('Lien copié', 'ok');
+        navigator.share(payload).then(function () {
+          ui.toast('Partagé', 'ok');
+        }).catch(function (e) {
+          // Annulé par l'utilisateur → on ne fait rien ; erreur système → repli copie
+          if (e && e.name !== 'AbortError') copyText(data.shareUrl, 'Lien copié');
         });
       } else {
-        ui.toast('Copiez le lien depuis la barre d\'adresse', 'err');
+        copyText(data.shareUrl, 'Lien copié');
       }
     });
   }
@@ -256,13 +322,10 @@
   var copyBtn = document.querySelector('[data-copy-link]');
   if (copyBtn) {
     copyBtn.addEventListener('click', function () {
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(data.shareUrl).then(function () { ui.toast('Lien copié', 'ok'); });
-      } else {
-        ui.toast('Copiez le lien depuis la barre d\'adresse', 'err');
-      }
+      copyText(data.shareUrl, 'Lien copié');
     });
   }
 
+  preselectSingles();
   refresh();
 })();

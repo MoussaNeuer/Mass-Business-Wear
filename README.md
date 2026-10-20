@@ -7,9 +7,13 @@ Aucune dépendance Composer, aucune librairie CDN : compatible hébergement PHP/
 
 ## Installation (WAMP / Apache + MySQL)
 
+> **Important — charset** : importer **toujours** avec `--default-character-set=utf8mb4`.
+> Sans ce drapeau, le client MySQL de WAMP se connecte en `cp850` et corrompt les accents
+> (« Vêtements » devient « V├¬tements »). Voir « Charset » plus bas.
+
 ```bash
-# 1. Importer le schéma
-mysql -u root < database/schema.sql
+# 1. Importer le schéma (charset forcé en utf8mb4)
+mysql -u root --default-character-set=utf8mb4 < database/schema.sql
 
 # 2. Configurer
 cp .env.example .env          # puis adapter DB_* et APP_URL
@@ -21,6 +25,27 @@ php database/create_admin.php --login=admin --password=VotreMotDePasse
 #    http://localhost/mass-business-wear/           (front controller racine)
 #    http://localhost/mass-business-wear/public/    (entrée directe)
 #    http://localhost/mass-business-wear/public/admin/login
+```
+
+### Données de démo (facultatif)
+
+```bash
+mysql -u root --default-character-set=utf8mb4 < database/seed_dev.sql
+mysql -u root --default-character-set=utf8mb4 < database/seed_orders_demo.sql
+```
+
+### Charset
+
+Toute la base est en `utf8mb4`. Les fichiers `database/*.sql` sont en UTF-8 **sans BOM**.
+Toujours passer `--default-character-set=utf8mb4` au client MySQL — c'est le seul moyen
+de garantir que le client n'envoie pas les requêtes en `cp850`/`cp437` (WAMP le fait par défaut).
+
+Si des accents sont corrompus en base (`├`, `├®`, `├á`, `┼ô`…), la conversion en une passe :
+
+```sql
+UPDATE categories
+   SET name = CONVERT(CAST(CONVERT(name USING cp850) AS BINARY) USING utf8mb4)
+ WHERE name LIKE '%├%';   -- à répéter par colonne/plate corrompue
 ```
 
 Le dossier exposé est `public/`. `app/`, `config/`, `database/`, `routes/`, `storage/` et `.env`

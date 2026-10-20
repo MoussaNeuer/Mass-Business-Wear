@@ -29,7 +29,16 @@ final class WhatsAppService
     /**
      * Lien wa.me pré-rempli pour la confirmation d'une commande.
      *
-     * @param list<array{product_name:string,size?:?string,color?:?string,unit_price:int,quantity:int,line_total:int}> $items
+     * $extra accepte, de façon optionnelle (rétro-compatibilité) :
+     *   - subtotal:int       sous-total articles
+     *   - shipping:int       frais de livraison
+     *   - currency:string    devise (défaut : celle des réglages)
+     *   - notes:string       note du client
+     *   - created_at:string  date/heure de commande (MySQL ou ISO)
+     *   - photos:int         nombre de photos de référence jointes
+     *   - order_url:string   lien de suivi de la commande
+     *
+     * @param list<array{product_name:string,size?:?string,color?:?string,unit_price:int,quantity:int,line_total?:int}> $items
      */
     public static function orderLink(
         string $reference,
@@ -38,46 +47,163 @@ final class WhatsAppService
         string $zone,
         string $address,
         array $items,
-        int $total
+        int $total,
+        array $extra = []
     ): string {
-        $shop = self::shopNumber();
-        $lines = [
-            '🛍️ *NOUVELLE COMMANDE* — MASS BUSINESS WEAR',
-            '',
-            'Référence : *' . $reference . '*',
-            'Client : ' . $customerName,
-            'Téléphone : ' . Format::phonePretty($customerPhone),
-            'Zone : ' . $zone,
-            'Adresse : ' . $address,
-            '',
-            '*Articles :*',
-        ];
+        $text = self::orderMessage(
+            $reference,
+            $customerName,
+            $customerPhone,
+            $zone,
+            $address,
+            $items,
+            $total,
+            $extra
+        );
 
-        foreach ($items as $item) {
-            $label = '- ' . $item['product_name'];
+        $shop = self::shopNumber();
+        return 'https://wa.me/' . $shop . '?text=' . rawurlencode($text);
+    }
+
+    /**
+     * Message de commande (séparé du lien pour pouvoir l'afficher / le tester).
+     *
+     * @param list<array{product_name:string,size?:?string,color?:?string,unit_price:int,quantity:int,line_total?:int}> $items
+     */
+    public static function orderMessage(
+        string $reference,
+        string $customerName,
+        string $customerPhone,
+        string $zone,
+        string $address,
+        array $items,
+        int $total,
+        array $extra = []
+    ): string {
+        $currency = (string) ($extra['currency'] ?? SettingRepository::currency());
+        $subtotal = (int) ($extra['subtotal'] ?? 0);
+        $shipping = (int) ($extra['shipping'] ?? 0);
+        $notes = trim((string) ($extra['notes'] ?? ''));
+        $photos = (int) ($extra['photos'] ?? 0);
+        $orderUrl = trim((string) ($extra['order_url'] ?? ''));
+        $date = self::dateLine((string) ($extra['created_at'] ?? ''));
+
+        $money = static fn (int $n): string => number_format($n, 0, ',', ' ') . ' ' . $currency;
+
+        $lines = [];
+        $lines[] = '🛍️ *NOUVELLE COMMANDE*';
+        $lines[] = self::shopName();
+        $lines[] = '━━━━━━━━━━━━━━━';
+        $lines[] = '';
+
+        // ---------------------------------------------------------- Repères
+        $lines[] = '📋 *Référence* : `' . $reference . '`';
+        if ($date !== '') {
+            $lines[] = '📅 ' . $date;
+        }
+        $lines[] = '';
+
+        // ---------------------------------------------------------- Client
+        $lines[] = '👤 *CLIENT*';
+        $lines[] = '• Nom : ' . $customerName;
+        $lines[] = '• Tél : ' . Format::phonePretty($customerPhone);
+        $lines[] = '';
+
+        // ------------------------------------------------------- Livraison
+        $lines[] = '🚚 *LIVRAISON*';
+        $lines[] = '• Zone : ' . ($zone !== '' ? $zone : 'À préciser');
+        $lines[] = '• Adresse : ' . ($address !== '' ? $address : 'À préciser');
+        if ($shipping > 0) {
+            $lines[] = '• Frais de livraison : ' . $money($shipping);
+        } else {
+            $lines[] = '• Frais de livraison : offerts / retrait';
+        }
+        if ($photos > 0) {
+            $lines[] = '• 📎 ' . $photos . ' photo(s) de référence jointe(s) à la commande';
+        }
+        $lines[] = '';
+
+        // -------------------------------------------------------- Articles
+        $lines[] = '🛒 *ARTICLES*';
+        if ($items === []) {
+            $lines[] = '_(détail disponible dans le récapitulatif)_';
+        }
+        foreach ($items as $i => $item) {
+            $qty = (int) $item['quantity'];
+            $unit = (int) $item['unit_price'];
+            $lineTotal = (int) ($item['line_total'] ?? ($unit * $qty));
+
+            $lines[] = '';
+            $lines[] = ($i + 1) . '. ' . $item['product_name'];
             $meta = trim(($item['size'] ?? '') . ' ' . ($item['color'] ?? ''));
             if ($meta !== '') {
-                $label .= ' (' . $meta . ')';
+                $lines[] = '   ↳ ' . $meta;
             }
-            $label .= ' × ' . (int) $item['quantity'] . ' = '
-                . number_format((int) $item['line_total'], 0, ',', ' ') . ' FCFA';
-            $lines[] = $label;
+            $lines[] = '   ' . $qty . ' × ' . $money($unit) . ' = *' . $money($lineTotal) . '*';
+        }
+        $lines[] = '';
+
+        // --------------------------------------------------------- Finances
+        $lines[] = '━━━━━━━━━━━━━━━';
+        if ($subtotal > 0) {
+            $lines[] = 'Sous-total : ' . $money($subtotal);
+        }
+        if ($shipping > 0) {
+            $lines[] = 'Livraison : ' . $money($shipping);
+        }
+        $lines[] = '💰 *TOTAL À PAYER : ' . $money($total) . '*';
+        $lines[] = 'Mode de paiement : à la livraison';
+        $lines[] = '';
+
+        if ($notes !== '') {
+            $lines[] = '📝 *Note du client*';
+            $lines[] = $notes;
+            $lines[] = '';
         }
 
-        $lines[] = '';
-        $lines[] = '*Total : ' . number_format($total, 0, ',', ' ') . ' FCFA*';
-        $lines[] = '';
-        $lines[] = 'Merci de confirmer cette commande.';
+        if ($orderUrl !== '') {
+            $lines[] = '🔗 Suivi de commande : ' . $orderUrl;
+            $lines[] = '';
+        }
 
-        $text = implode("\n", $lines);
-        $url = 'https://wa.me/' . ($shop !== '' ? $shop : '') . '?text=' . rawurlencode($text);
-        return $url;
+        // ------------------------------------------------- Instructions
+        $lines[] = '━━━━━━━━━━━━━━━';
+        $lines[] = '✅ *À faire*';
+        $lines[] = '1. Vérifier la disponibilité des articles';
+        $lines[] = '2. Appeler le client pour confirmer';
+        $lines[] = '3. Convenir du créneau de livraison';
+        $lines[] = '';
+        $lines[] = '🙏 Merci de votre confiance — *MASS BUSINESS WEAR*';
+        $lines[] = 'Référence à conserver : `' . $reference . '`';
+
+        return implode("\n", $lines);
+    }
+
+    /** Nom de la boutique depuis les réglages. */
+    private static function shopName(): string
+    {
+        $name = trim(SettingRepository::get('shop_name'));
+        return $name !== '' ? $name : 'MASS BUSINESS WEAR';
+    }
+
+    /** Date lisible, ou chaîne vide si absente/invalide. */
+    private static function dateLine(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '';
+        }
+        $ts = strtotime($raw);
+        if ($ts === false) {
+            return '';
+        }
+        return date('d/m/Y à H:i', $ts);
     }
 
     /** Lien générique (contact / partage). */
     public static function link(string $text): string
     {
         $shop = self::shopNumber();
-        return 'https://wa.me/' . ($shop !== '' ? $shop : '') . '?text=' . rawurlencode($text);
+        return 'https://wa.me/' . $shop . '?text=' . rawurlencode($text);
     }
 }

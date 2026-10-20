@@ -224,8 +224,13 @@ final class Format
 
     public static function phonePretty(string $phone): string
     {
-        if (strlen($phone) === 9) {
-            return substr($phone, 0, 2) . ' ' . substr($phone, 2, 2) . ' ' . substr($phone, 4, 2) . ' ' . substr($phone, 6);
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+        if (strlen($digits) === 9) {
+            // Format sénégalais sur 9 chiffres : 77 123 45 67
+            return substr($digits, 0, 2) . ' '
+                . substr($digits, 2, 3) . ' '
+                . substr($digits, 5, 2) . ' '
+                . substr($digits, 7, 2);
         }
         return $phone;
     }

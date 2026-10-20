@@ -9,6 +9,7 @@ use App\Helpers\Request;
 use App\Helpers\Response;
 use App\Helpers\View;
 use App\Repositories\SettingRepository;
+use App\Services\WhatsAppService;
 
 /**
  * Page succès après commande — Phase 4.
@@ -26,7 +27,7 @@ final class OrderSuccessController
         if ($ref !== '' && preg_match('/^MBW-[A-Z0-9]{6,12}-\d{3}$/', $ref) === 1) {
             $order = Database::one(
                 'SELECT o.id, o.reference, o.total, o.shipping, o.subtotal, o.status, o.zone, o.address,
-                        o.created_at, c.name AS customer_name, c.phone AS customer_phone
+                        o.notes, o.created_at, c.name AS customer_name, c.phone AS customer_phone
                  FROM orders o
                  JOIN customers c ON c.id = o.customer_id
                  WHERE o.reference = ?
@@ -54,20 +55,43 @@ final class OrderSuccessController
         }
 
         $currency = SettingRepository::currency();
-        $waLines = [
-            'Confirmation commande ' . $order['reference'],
-            'Client : ' . $order['customer_name'],
-            'Total : ' . number_format((int) $order['total'], 0, ',', ' ') . ' ' . $currency,
-        ];
-        foreach ($items as $it) {
-            $meta = trim(($it['size'] ?? '') . ' ' . ($it['color'] ?? ''));
-            $waLines[] = '- ' . $it['product_name'] . ($meta !== '' ? ' (' . $meta . ')' : '')
-                . ' ×' . (int) $it['quantity'];
+
+        // Nombre de photos de référence jointes (Sprint C)
+        $photosCount = (int) (Database::value(
+            'SELECT COUNT(*) FROM order_images WHERE order_id = ?',
+            [(int) $order['id']]
+        ) ?? 0);
+
+        // Libellé de zone lisible (la colonne peut contenir un ancien id)
+        $zone = (string) $order['zone'];
+        if ($zone !== '' && ctype_digit($zone)) {
+            $label = Database::value('SELECT name FROM shipping_zones WHERE id = ? LIMIT 1', [(int) $zone]);
+            if (is_string($label) && $label !== '') {
+                $zone = $label;
+            }
         }
-        $waText = implode("\n", $waLines);
-        $waShop = preg_replace('/\D+/', '', (string) SettingRepository::whatsapp());
-        $waUrl = 'https://wa.me/' . ($waShop !== '' ? '221' . $waShop : '')
-            . '?text=' . rawurlencode($waText);
+        $order['zone'] = $zone; // la vue affiche le libellé, pas l'id
+
+        $waUrl = WhatsAppService::orderLink(
+            (string) $order['reference'],
+            (string) $order['customer_name'],
+            (string) $order['customer_phone'],
+            $zone,
+            (string) $order['address'],
+            array_map(static function (array $it): array {
+                $it['line_total'] = (int) $it['unit_price'] * (int) $it['quantity'];
+                return $it;
+            }, $items),
+            (int) $order['total'],
+            [
+                'subtotal' => (int) $order['subtotal'],
+                'shipping' => (int) $order['shipping'],
+                'currency' => $currency,
+                'notes' => (string) ($order['notes'] ?? ''),
+                'created_at' => (string) $order['created_at'],
+                'photos' => $photosCount,
+            ]
+        );
 
         View::echo('shop/order-success', [
             'title' => 'Commande ' . $order['reference'] . ' — MASS BUSINESS WEAR',

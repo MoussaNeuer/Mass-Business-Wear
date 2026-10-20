@@ -73,18 +73,42 @@ final class OrderService
         // Idempotence : même clé → même commande (retry réseau sans double)
         if ($idempotencyKey !== null && $idempotencyKey !== '') {
             $existing = Database::one(
-                'SELECT reference, total, shipping, subtotal FROM orders WHERE idempotency_key = ? LIMIT 1',
+                'SELECT o.id, o.reference, o.total, o.shipping, o.subtotal, o.zone, o.address,
+                        o.notes, o.created_at
+                 FROM orders o WHERE o.idempotency_key = ? LIMIT 1',
                 [$idempotencyKey]
             );
             if ($existing !== null) {
+                // On rejoue le message avec le détail réellement enregistré,
+                // pour que le client retrouve exactement sa commande.
+                $orderItems = Database::all(
+                    'SELECT product_name, size, color, unit_price, quantity
+                     FROM order_items WHERE order_id = ? ORDER BY id ASC',
+                    [(int) $existing['id']]
+                );
+                $photosCount = (int) (Database::value(
+                    'SELECT COUNT(*) FROM order_images WHERE order_id = ?',
+                    [(int) $existing['id']]
+                ) ?? 0);
+
                 $wa = WhatsAppService::orderLink(
                     (string) $existing['reference'],
                     $name,
                     $phone,
-                    self::zoneLabel($zone),
-                    $address,
-                    [], // déjà envoyé
-                    (int) $existing['total']
+                    self::zoneLabel((string) $existing['zone']),
+                    (string) $existing['address'],
+                    array_map(static function (array $it): array {
+                        $it['line_total'] = (int) $it['unit_price'] * (int) $it['quantity'];
+                        return $it;
+                    }, $orderItems),
+                    (int) $existing['total'],
+                    [
+                        'subtotal' => (int) $existing['subtotal'],
+                        'shipping' => (int) $existing['shipping'],
+                        'notes' => (string) ($existing['notes'] ?? ''),
+                        'created_at' => (string) $existing['created_at'],
+                        'photos' => $photosCount,
+                    ]
                 );
                 return [
                     'reference' => (string) $existing['reference'],
@@ -93,7 +117,7 @@ final class OrderService
                     'shipping' => (int) $existing['shipping'],
                     'subtotal' => (int) $existing['subtotal'],
                     'duplicate' => true,
-                    'images_count' => 0,
+                    'images_count' => $photosCount,
                 ];
             }
         }
@@ -195,7 +219,7 @@ final class OrderService
                     $idempotencyKey !== null && $idempotencyKey !== '' ? substr($idempotencyKey, 0, 64) : null,
                     $customerId,
                     $address,
-                    $zone,
+                    $zoneLabel,
                     $subtotal,
                     $shipping,
                     $total,
@@ -244,19 +268,13 @@ final class OrderService
             return [
                 'reference' => $reference,
                 'order_id' => $orderId,
-                'whatsapp_url' => WhatsAppService::orderLink(
-                    $reference,
-                    $name,
-                    $phone,
-                    $zoneLabel,
-                    $address,
-                    $resolved,
-                    $total
-                ),
                 'total' => $total,
                 'shipping' => $shipping,
                 'subtotal' => $subtotal,
                 'duplicate' => false,
+                // lignes résolues : nécessaires pour construire le message WhatsApp
+                // une fois les photos de référence écrites (hors transaction).
+                'lines' => $resolved,
             ];
         });
 
@@ -279,6 +297,30 @@ final class OrderService
             }
         }
         $result['images_count'] = $saved;
+
+        // Lien WhatsApp construit APRÈS la transaction et les photos :
+        // on y intègre sous-total, frais de livraison, note, date et photos jointes.
+        $lines = is_array($result['lines'] ?? null) ? $result['lines'] : [];
+        $result['whatsapp_url'] = WhatsAppService::orderLink(
+            (string) $result['reference'],
+            $name,
+            $phone,
+            $zoneLabel,
+            $address,
+            array_map(static function (array $line): array {
+                $line['line_total'] = (int) $line['unit_price'] * (int) $line['quantity'];
+                return $line;
+            }, $lines),
+            $total,
+            [
+                'subtotal' => $subtotal,
+                'shipping' => $shipping,
+                'notes' => $note,
+                'created_at' => date('Y-m-d H:i:s'),
+                'photos' => $saved,
+            ]
+        );
+        unset($result['lines']);
 
         return $result;
     }

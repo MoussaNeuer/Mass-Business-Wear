@@ -33,13 +33,19 @@ use App\Helpers\Url;
 <form method="post" action="<?= Url::admin('settings') ?>" class="admin-card">
   <div class="admin-card__head"><h2 class="admin-card__title">Contact</h2></div>
   <div class="admin-field">
-    <label for="s-wa">WhatsApp (9 chiffres, ex. 771234567)</label>
-    <input id="s-wa" name="whatsapp" maxlength="20" value="<?= Security::e((string) ($settings['whatsapp'] ?? '')) ?>" inputmode="tel">
-    <small>Utilisé pour les liens de commande et de confirmation.</small>
+    <label for="s-wa">WhatsApp boutique</label>
+    <input id="s-wa" value="<?= Security::e(\App\Repositories\SettingRepository::WHATSAPP) ?>"
+           inputmode="tel" readonly style="opacity:.75">
+    <small>Numéro <strong>codé en dur</strong> dans le code source
+      (<code>SettingRepository::WHATSAPP</code>). Il alimente tous les liens
+      WhatsApp et les messages de commande.</small>
   </div>
   <div class="admin-field">
     <label for="s-phone">Téléphone</label>
-    <input id="s-phone" name="phone" maxlength="20" value="<?= Security::e((string) ($settings['phone'] ?? '')) ?>">
+    <input id="s-phone" value="<?= Security::e(\App\Repositories\SettingRepository::PHONE) ?>"
+           inputmode="tel" readonly style="opacity:.75">
+    <small>Numéro <strong>codé en dur</strong>
+      (<code>SettingRepository::PHONE</code>), affiché sur la page Contact et À propos.</small>
   </div>
   <div class="admin-field">
     <label for="s-email">Email</label>

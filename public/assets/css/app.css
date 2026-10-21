@@ -109,6 +109,7 @@ button { font: inherit; }
 /* --------------------------------------------------------- Search bar */
 
 .searchbar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: .5rem;
